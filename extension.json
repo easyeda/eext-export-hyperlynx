@@ -1,0 +1,46 @@
+{
+	"name": "export-hyperlynx",
+	"uuid": "32d0d0812f004f08a707b81ff309ab0c",
+	"displayName": "导出HyperLynx",
+	"description": "导出 PCB 为 HyperLynx (.hyp) 格式文件，便于进行信号完整性分析。",
+	"version": "1.0.0",
+	"publisher": "EasyEDA",
+	"engines": {
+		"eda": "^3.2.0"
+	},
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/easyeda/eext-export-hyperlynx"
+	},
+	"homepage": "https://github.com/easyeda/eext-export-hyperlynx",
+	"bugs": "https://github.com/easyeda/eext-export-hyperlynx/issues",
+	"categories": "Tool",
+	"keywords": [
+		"Tool",
+		"Export",
+		"HyperLynx",
+		"Signal Integrity"
+	],
+	"images": {
+		"logo": "./images/logo.png"
+	},
+	"activationEvents": {},
+	"entry": "./dist/index",
+	"dependentExtensions": {},
+	"headerMenus": {
+		"pcb": [
+			{
+				"id": "export-hyperlynx",
+				"title": "Export HyperLynx",
+				"menuItems": [
+					{
+						"id": "ExportHyp",
+						"title": "Export HyperLynx (.hyp)...",
+						"registerFn": "exportHyperLynx"
+					}
+				]
+			}
+		]
+	}
+}

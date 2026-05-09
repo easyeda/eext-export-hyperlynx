@@ -1,0 +1,9 @@
+{
+	"About": "关于",
+	"Export HyperLynx": "导出 HyperLynx",
+	"Export PCB to HyperLynx format": "将 PCB 设计导出为 HyperLynx (.hyp) 格式，用于信号完整性分析",
+	"Please open a PCB document first": "请先打开一个 PCB 文档",
+	"Collecting PCB data...": "正在收集 PCB 数据...",
+	"HyperLynx export completed": "HyperLynx 导出完成",
+	"Export failed": "导出失败"
+}

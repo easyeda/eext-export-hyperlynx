@@ -1,0 +1,9 @@
+{
+	"About": "About",
+	"Export HyperLynx": "Export HyperLynx",
+	"Export PCB to HyperLynx format": "Export PCB design to HyperLynx (.hyp) format for signal integrity analysis",
+	"Please open a PCB document first": "Please open a PCB document first",
+	"Collecting PCB data...": "Collecting PCB data...",
+	"HyperLynx export completed": "HyperLynx export completed",
+	"Export failed": "Export failed"
+}

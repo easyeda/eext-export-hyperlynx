@@ -1,5 +1,11 @@
 {
 	"Export HyperLynx": "Export HyperLynx",
 	"Export HyperLynx (.hyp)...": "Export HyperLynx (.hyp)...",
-	"About...": "About..."
+	"About...": "About...",
+	"导出HyperLynx": "Export HyperLynx",
+	"导出 PCB 为 HyperLynx (.hyp) 格式文件，便于进行信号完整性分析。": "Export PCB to HyperLynx (.hyp) format for signal integrity analysis.",
+	"Tool": "Tool",
+	"Export": "Export",
+	"HyperLynx": "HyperLynx",
+	"Signal Integrity": "Signal Integrity"
 }

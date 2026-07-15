@@ -1,47 +1,77 @@
 [简体中文](./README.md) | [English](./README.en.md) | [繁體中文](#) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-# pro-api-sdk
+# Export HyperLynx
 
-嘉立創EDA & EasyEDA 專業版擴展 API 開發工具
+嘉立創EDA (EasyEDA) 專業版擴展 — 將 PCB 設計匯出為 HyperLynx (.hyp) 檔案格式，用於信號完整性模擬分析。
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## 功能
 
-> [!NOTE]
->
-> 有關 嘉立創EDA專業版 擴展程式開發的更多資訊，請訪問：[https://prodocs.easyeda.com/cn/api/guide/](https://prodocs.easyeda.com/cn/api/guide/)
+- 匯出 PCB 板框 (`BOARD`)
+- 匯出層疊結構 (`STACKUP`)，包含銅箔層與介質層
+- 匯出器件資訊 (`DEVICES`)
+- 匯出焊盤定義 (`PADSTACK`)，自動去重
+- 匯出網路資訊 (`NET`)，包含引腳 (`PIN`)、過孔 (`VIA`)、走線 (`SEG`)、圓弧 (`ARC`)
+- 自動處理無網路物件：每個未連接物件單獨歸入 `EmptyNet<N>`
+- 座標自動轉換：EasyEDA 內部單位 (mil) → 英吋 (inch)，Y 軸取反
+- 相容 HyperLynx v2.14 格式
 
-## 進入開發
+## 使用方法
 
-本開發工具組包含了用於開發 [嘉立創EDA專業版](https://pro.easyeda.com/) 擴展程式的所有環境和工具，並內置了 ESLint 的推薦規則。
+1. 在嘉立創EDA專業版中開啟一個 PCB 文件
+2. 點擊選單 **Export HyperLynx → Export HyperLynx (.hyp)...**
+3. 自動生成並下載 `.hyp` 檔案
 
-1. 克隆 [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) 項目倉庫到本地
+## 匯出格式
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+生成的 `.hyp` 檔案遵循 HyperLynx 2.14 格式規範，包含以下節：
 
-2. 初始化開發環境（安裝依賴）
+| 節 | 描述 |
+|---|------|
+| `{VERSION}` | 版本資訊 (2.14) |
+| `{UNITS}` | 單位 (ENGLISH LENGTH / 英吋) |
+| `{BOARD}` | 板框輪廓 (PERIMETER_SEGMENT) |
+| `{STACKUP}` | 層疊定義 (SIGNAL + DIELECTRIC) |
+| `{DEVICES}` | 器件列表 (REF + Layer) |
+| `{PADSTACK}` | 焊盤堆疊定義 |
+| `{NET}` | 網路資料 (PIN / VIA / SEG / ARC) |
 
-    ```shell
-    npm install
-    ```
+更多格式細節請參考 [docs/hyperlynx-file-format.md](./docs/hyperlynx-file-format.md)。
 
-3. 進行些許變更 ...
+## 專案結構
 
-    - 將資料夾名稱修改為你的擴展程式名稱
-    - 參考 [開發指南](https://prodocs.lceda.cn/en/api/guide/how-to-start.html#ii-extension-configuration) 修改 `extension.json` 中的 `name`、`displayName`、`description`、`publisher` 欄位
-    - 結合 [擴展 API 參考文件](https://prodocs.lceda.cn/en/api/reference/pro-api.html) 撰寫你的程式碼
+```text
+src/
+├── index.ts          # 擴展入口與匯出命令
+├── types.ts          # 型別定義與層常數
+├── utils.ts          # 單位轉換、焊盤解析、圓弧計算等工具函式
+├── collect.ts        # 從 EasyEDA Pro API 收集 PCB 資料
+├── generate.ts       # 組裝各節並生成 .hyp 文字
+└── writers/
+    ├── board.ts      # {BOARD} 板框輸出
+    ├── stackup.ts    # {STACKUP} 層疊輸出
+    ├── devices.ts    # {DEVICES} 器件輸出
+    ├── padstacks.ts  # {PADSTACK} 焊盤堆疊輸出
+    └── nets.ts       # {NET} 網路物件輸出
+```
 
-4. 編譯擴展程式
+## 實作要點
 
-    ```shell
-    npm run build
-    ```
+- 板框從 `layer 11`（板框層）讀取，圓弧會被多邊形化為線段。
+- 焊盤形狀與鑽孔按 EasyEDA 回傳的元組格式解析，支援橢圓/矩形/圓角矩形/正多邊形近似。
+- 通孔與 SMD 焊盤透過是否位於 `MULTI` 層（layer 12）判斷。
+- 焊盤堆疊去重綜合考慮形狀 ID、尺寸、角度、鑽孔、層集合及通孔標誌，避免不同層焊盤被錯誤複用。
+- 去重邏輯參考 KiCad HyperLynx 匯出器實現，保證相容性。
+- 圓弧走線在網路節中輸出為 `ARC`，圓心、半徑按逆時針方向整理。
 
-5. 在 嘉立創EDA專業版 中安裝生成在 `./build/dist/` 下的擴展程式
+## 開發
+
+```shell
+npm install
+npm run build
+```
+
+生成的擴展包位於 `./build/dist/export-hyperlynx_v1.0.0.eext`，可在嘉立創EDA專業版中安裝。
 
 ## 開源許可
 
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
-
-本開發工具組使用 [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) 開源許可協定，你僅可以將 **嘉立创EDA**、**嘉立創EDA**、**EasyEDA** 商標資訊用於依託於本工具組開發的擴展程式的 **功能描述部分** 和 **開源發佈的標題部分**。
+[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/)

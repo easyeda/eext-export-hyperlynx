@@ -1,47 +1,77 @@
 [简体中文](./README.md) | [English](./README.en.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](#)
 
-# pro-api-sdk
+# Export HyperLynx
 
-嘉立创EDA & EasyEDA Pro Edition Расширьте возможности инструментов разработки API
+Расширение для EasyEDA Pro — экспортирует проекты печатных плат (PCB) в формат HyperLynx (.hyp) для анализа целостности сигналов.
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## Возможности
 
-> [!NOTE]
->
-> Для получения подробной документации по разработке, пожалуйста, посетите: [https://prodocs.easyeda.com/en/api/guide/](https://prodocs.easyeda.com/en/api/guide/)
+- Экспорт контура платы (`BOARD`)
+- Экспорт стека слоев (`STACKUP`) с медными и диэлектрическими слоями
+- Экспорт информации о компонентах (`DEVICES`)
+- Экспорт определений пятачков (`PADSTACK`) с автоматическим удалением дубликатов
+- Экспорт данных цепей (`NET`) включая контакты (`PIN`), переходные отверстия (`VIA`), дорожки (`SEG`) и дуги (`ARC`)
+- Обработка неподключенных объектов: каждый неподключенный примитив помещается в отдельную цепь `EmptyNet<N>`
+- Автоматическое преобразование координат: внутренние единицы EasyEDA (mil) → дюймы, с инверсией оси Y
+- Совместимость с форматом HyperLynx v2.14
 
-## Войти в разработку
+## Использование
 
-Этот набор инструментов разработки содержит все среды и инструменты для разработки пакета расширений [EasyEDA Pro Edition](https://pro.easyeda.com/), а также имеет встроенные рекомендуемые правила для ESLint.
+1. Откройте PCB-документ в EasyEDA Pro
+2. Нажмите меню **Export HyperLynx → Export HyperLynx (.hyp)...**
+3. Файл `.hyp` будет сгенерирован и автоматически загружен
 
-1. Клонируйте репозиторий проекта [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) на свой локальный компьютер
+## Формат выходного файла
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+Сгенерированный файл `.hyp` соответствует спецификации HyperLynx 2.14 и содержит следующие секции:
 
-2. Инициализация среды разработки (установка зависимостей)
+| Секция | Описание |
+|--------|----------|
+| `{VERSION}` | Информация о версии (2.14) |
+| `{UNITS}` | Единицы измерения (ENGLISH LENGTH / дюймы) |
+| `{BOARD}` | Контур платы (PERIMETER_SEGMENT) |
+| `{STACKUP}` | Определение стека слоев (SIGNAL + DIELECTRIC) |
+| `{DEVICES}` | Список компонентов (REF + Layer) |
+| `{PADSTACK}` | Определения стеков пятачков |
+| `{NET}` | Данные цепей (PIN / VIA / SEG / ARC) |
 
-    ```shell
-    npm install
-    ```
+Подробнее о формате см. [docs/hyperlynx-file-format.md](./docs/hyperlynx-file-format.md).
 
-3. Внесите несколько изменений...
+## Структура проекта
 
-    - Измените название папки на название вашего проекта
-    - Ознакомьтесь с [Руководством по разработке](https://prodocs.lceda.cn/en/api/guide/how-to-start.html#ii-extension-configuration) и измените поля `name`, `displayName`, `description` и `publisher` в файле `extension.json`
-    - Напишите свой код, руководствуясь [справочником по API расширений](https://prodocs.lceda.cn/en/api/reference/pro-api.html)
+```text
+src/
+├── index.ts          # Точка входа расширения и команда экспорта
+├── types.ts          # Определения типов и константы слоев
+├── utils.ts          # Преобразование единиц, разбор пятачков, расчет дуг
+├── collect.ts        # Сбор данных PCB через API EasyEDA Pro
+├── generate.ts       # Сборка секций и генерация текста .hyp
+└── writers/
+    ├── board.ts      # Запись {BOARD}
+    ├── stackup.ts    # Запись {STACKUP}
+    ├── devices.ts    # Запись {DEVICES}
+    ├── padstacks.ts  # Запись {PADSTACK}
+    └── nets.ts       # Запись {NET}
+```
 
-4. Компиляция пакета расширения
+## Примечания по реализации
 
-    ```shell
-    npm run build
-    ```
+- Контур платы считывается из `layer 11` (слой контура платы); дуги аппроксимируются отрезками.
+- Формы пятачков и отверстия разбираются из кортежей, возвращаемых EasyEDA; поддерживаются эллипс/прямоугольник/прямоугольник со скруглением/аппроксимация правильного многоугольника.
+- Сквозные (through-hole) и SMD-пятачки определяются по наличию на слое `MULTI` (layer 12).
+- Дедупликация стеков пятачков учитывает идентификатор формы, размеры, угол, отверстие, набор слоев и признак сквозного отверстия, предотвращая ошибочное повторное использование пятачков на разных слоях.
+- Логика дедупликации приведена в соответствие с экспортером HyperLynx в KiCad для обеспечения совместимости.
+- Дуговые дорожки выводятся в секциях цепей как `ARC` с центром и радиусом, нормализованными против часовой стрелки.
 
-5. Установите пакет расширения, сгенерированный в разделе `./build/dist/` в EasyEDA Pro Edition
+## Разработка
 
-## Лицензия с открытым исходным кодом
+```shell
+npm install
+npm run build
+```
 
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+Пакет расширения генерируется по пути `./build/dist/export-hyperlynx_v1.0.0.eext` и может быть установлен в EasyEDA Pro.
 
-Эта группа инструментов разработки использует лицензионное соглашение с открытым исходным кодом [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/), и вы можете использовать только информацию о товарном знаке **嘉立创EDA**, **EasyEDA** для **части описания функции** и **части названия выпуска с открытым исходным кодом** пакета расширений, разработанного на основе этой группы инструментов.
+## Лицензия
+
+[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/)

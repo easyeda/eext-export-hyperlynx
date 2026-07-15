@@ -1,47 +1,77 @@
 [简体中文](./README.md) | [English](./README.en.md) | [繁體中文](./README.zh-Hant.md) | [日本語](#) | [Русский](./README.ru.md)
 
-# pro-api-sdk
+# Export HyperLynx
 
-嘉立创EDA & EasyEDA Pro Edition は API 開発ツールを拡張します
+嘉立创EDA (EasyEDA) 专业版の拡張機能 — PCB 設計を HyperLynx (.hyp) ファイル形式にエクスポートし、信号整合性解析に利用します。
 
-<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/stars/easyeda/pro-api-sdk" alt="GitHub Repo Stars" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk/issues" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/issues/easyeda/pro-api-sdk" alt="GitHub Issues" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://github.com/easyeda/pro-api-sdk" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/repo-size/easyeda/pro-api-sdk" alt="GitHub Repo Size" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/v/%40jlceda%2Fpro-api-types?label=pro-api-types" alt="NPM Version" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>&nbsp;<a href="https://www.npmjs.com/package/@jlceda/pro-api-types" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/npm/d18m/%40jlceda%2Fpro-api-types" alt="NPM Downloads" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
+## 機能
 
-> [!NOTE]
->
-> 詳細な開発ドキュメントについては、以下をご覧ください：[https://prodocs.easyeda.com/en/api/guide/](https://prodocs.easyeda.com/en/api/guide/)
+- PCB ボード外形 (`BOARD`) のエクスポート
+- 積層構造 (`STACKUP`) のエクスポート（銅箔層と誘電体層を含む）
+- デバイス情報 (`DEVICES`) のエクスポート
+- パッド定義 (`PADSTACK`) のエクスポート、自動重複排除付き
+- ネット情報 (`NET`) のエクスポート（ピン `PIN`、ビア `VIA`、配線 `SEG`、円弧 `ARC` を含む）
+- 未接続オブジェクトの自動処理：未接続の各プリミティブを個別の `EmptyNet<N>` に振り分け
+- 座標の自動変換：EasyEDA 内部単位 (mil) → インチ (inch)、Y 軸反転
+- HyperLynx v2.14 形式との互換性
 
-## 開発に入る
+## 使用方法
 
-この開発ツールセットには、[EasyEDA Pro Edition](https://pro.easyeda.com/) 拡張パッケージを開発するためのすべての環境とツールが含まれており、ESLint の推奨ルールが組み込まれています。
+1. EasyEDA Pro で PCB ドキュメントを開きます
+2. メニュー **Export HyperLynx → Export HyperLynx (.hyp)...** をクリックします
+3. `.hyp` ファイルが自動生成され、ダウンロードされます
 
-1. プロジェクト [pro-api-sdk](https://github.com/easyeda/pro-api-sdk) リポジトリをローカル コンピューターにクローンします
+## エクスポート形式
 
-    ```shell
-    git clone --depth=1 https://github.com/easyeda/pro-api-sdk.git
-    ```
+生成される `.hyp` ファイルは HyperLynx 2.14 形式の仕様に従っており、以下のセクションで構成されます：
 
-2. 開発環境の初期化 (依存関係のインストール)
+| セクション | 説明 |
+|-----------|------|
+| `{VERSION}` | バージョン情報 (2.14) |
+| `{UNITS}` | 単位 (ENGLISH LENGTH / インチ) |
+| `{BOARD}` | ボード外形 (PERIMETER_SEGMENT) |
+| `{STACKUP}` | 積層定義 (SIGNAL + DIELECTRIC) |
+| `{DEVICES}` | デバイス一覧 (REF + Layer) |
+| `{PADSTACK}` | パッドスタック定義 |
+| `{NET}` | ネットデータ (PIN / VIA / SEG / ARC) |
 
-    ```shell
-    npm install
-    ```
+形式の詳細については [docs/hyperlynx-file-format.md](./docs/hyperlynx-file-format.md) を参照してください。
 
-3. いくつかの変更を加えます...
+## プロジェクト構成
 
-    - フォルダ名をプロジェクト名に変更してください
-    - [開発ガイド](https://prodocs.lceda.cn/en/api/guide/how-to-start.html#ii-extension-configuration) を参照し、`extension.json` 内の `name`、`displayName`、`description`、`publisher` フィールドを変更してください
-    - [拡張機能 API リファレンス](https://prodocs.lceda.cn/en/api/reference/pro-api.html) を参照して、コードを作成してください
+```text
+src/
+├── index.ts          # 拡張機能のエントリポイントとエクスポートコマンド
+├── types.ts          # 型定義と層定数
+├── utils.ts          # 単位換算、パッド解析、円弧計算などのユーティリティ
+├── collect.ts        # EasyEDA Pro API から PCB データを収集
+├── generate.ts       # 各セクションを組み立てて .hyp テキストを生成
+└── writers/
+    ├── board.ts      # {BOARD} 外形出力
+    ├── stackup.ts    # {STACKUP} 積層出力
+    ├── devices.ts    # {DEVICES} デバイス出力
+    ├── padstacks.ts  # {PADSTACK} パッドスタック出力
+    └── nets.ts       # {NET} ネットオブジェクト出力
+```
 
-4. 拡張機能パッケージをコンパイルする
+## 実装上のポイント
 
-    ```shell
-    npm run build
-    ```
+- ボード外形は `layer 11`（ボード外形層）から読み取り、円弧は線分に多角形近似されます。
+- パッド形状とドリルは EasyEDA が返すタプル形式から解析され、楕円/矩形/角丸矩形/正多角形の近似に対応します。
+- スルーホールと SMD パッドは、`MULTI` 層（layer 12）にあるかどうかで判定されます。
+- パッドスタックの重複排除では、形状 ID、サイズ、角度、ドリル、層セット、スルーホールフラグを総合的に比較し、異なる層のパッドが誤って共有可能になるのを防ぎます。
+- 重複排除ロジックは KiCad の HyperLynx エクスポーター実装と整合し、互換性を保っています。
+- 円弧配線はネットセクション内で `ARC` として出力され、円心と半径は反時計回り方向に正規化されます。
 
-5. EasyEDA Pro Edition の `./build/dist/` の下に生成された拡張パッケージをインストールします
+## 開発
+
+```shell
+npm install
+npm run build
+```
+
+生成された拡張パッケージは `./build/dist/export-hyperlynx_v1.0.0.eext` にあり、EasyEDA Pro にインストールできます。
 
 ## オープンソースライセンス
 
-<a href="https://choosealicense.com/licenses/apache-2.0/" style="vertical-align: inherit;" target="_blank"><img src="https://img.shields.io/github/license/easyeda/pro-api-sdk" alt="GitHub License" class="not-medium-zoom-image" style="display: inline; vertical-align: inherit;" /></a>
-
-この開発ツールグループは、[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) オープンソースライセンス契約を使用しており、このツールグループに基づいて開発された拡張パッケージの **機能説明部分** および **オープンソースリリースタイトル部分** の **嘉立创EDA**、**EasyEDA** 商標情報のみを使用することができます。
+[Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/)

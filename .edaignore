@@ -1,12 +1,18 @@
+# 开发工具与编辑器配置
+/.claude/
 /.git/
 /.husky/
 /.vscode/
-/.claude/
+
+# 构建与依赖
 /build/
 /config/
 /coverage/
 /node_modules/
 /src/
+/test/
+
+# 项目配置（扩展运行时不需要）
 /.editorconfig
 /.gitattributes
 /.gitignore
@@ -17,6 +23,8 @@
 /tsconfig.json
 .eslintcache
 debug.log
+
+# 扩展未使用的资源
 /iframe/
 /.github/
 /docs/

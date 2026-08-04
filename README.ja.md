@@ -2,66 +2,68 @@
 
 # Export HyperLynx
 
-嘉立创EDA (EasyEDA) 专业版の拡張機能 — PCB 設計を HyperLynx (.hyp) ファイル形式にエクスポートし、信号整合性解析に利用します。
+EasyEDA Pro 拡張機能 — PCB 設計を HyperLynx (.hyp) ファイル形式にエクスポートし、信号整合性解析に利用します。
 
 ## 機能
 
-- PCB ボード外形 (`BOARD`) のエクスポート
-- 積層構造 (`STACKUP`) のエクスポート（銅箔層と誘電体層を含む）
-- デバイス情報 (`DEVICES`) のエクスポート
-- パッド定義 (`PADSTACK`) のエクスポート、自動重複排除付き
-- ネット情報 (`NET`) のエクスポート（ピン `PIN`、ビア `VIA`、配線 `SEG`、円弧 `ARC` を含む）
-- 未接続オブジェクトの自動処理：未接続の各プリミティブを個別の `EmptyNet<N>` に振り分け
-- 座標の自動変換：EasyEDA 内部単位 (mil) → インチ (inch)、Y 軸反転
-- HyperLynx v2.14 形式との互換性
+- 現在の PCB 文書を HyperLynx 2.14 形式の `.hyp` ファイルにエクスポート
+- エクスポート対象：
+  - 基板外形 (`BOARD`)
+  - 層構成 (`STACKUP`)：銅箔層と誘電体層
+  - デバイス情報 (`DEVICES`)
+  - パッド/ビア スタック (`PADSTACK`)
+  - ネットデータ (`NET`)：ピン (`PIN`)、ビア (`VIA`)、配線 (`SEG`)、弧 (`ARC`)、ポリゴン プール (`POLYGON`)
+- 未接続オブジェクトを自動処理し、データ欠落を防止
+- 座標を mil からインチに自動変換し、HyperLynx 座標系に対応
+- ヘッダーメニューからワンクリックでエクスポート
 
 ## 使用方法
 
-1. EasyEDA Pro で PCB ドキュメントを開きます
-2. メニュー **Export HyperLynx → Export HyperLynx (.hyp)...** をクリックします
-3. `.hyp` ファイルが自動生成され、ダウンロードされます
+1. EasyEDA Pro で PCB 文書を開く
+2. 上部メニュー **Export HyperLynx → Export HyperLynx (.hyp)...** をクリック
+3. 保存ダイアログで保存先を選択し、`.hyp` ファイルを生成
 
-## エクスポート形式
+## 出力ファイル
 
-生成される `.hyp` ファイルは HyperLynx 2.14 形式の仕様に従っており、以下のセクションで構成されます：
+生成される `.hyp` ファイルは HyperLynx 2.14 ASCII 形式に準拠しており、以下のセクションで構成されます：
 
-| セクション | 説明 |
+| セクション | 内容 |
 |-----------|------|
-| `{VERSION}` | バージョン情報 (2.14) |
-| `{UNITS}` | 単位 (ENGLISH LENGTH / インチ) |
-| `{BOARD}` | ボード外形 (PERIMETER_SEGMENT) |
-| `{STACKUP}` | 積層定義 (SIGNAL + DIELECTRIC) |
-| `{DEVICES}` | デバイス一覧 (REF + Layer) |
-| `{PADSTACK}` | パッドスタック定義 |
-| `{NET}` | ネットデータ (PIN / VIA / SEG / ARC) |
+| `{VERSION}` | 形式バージョン 2.14 |
+| `{UNITS}` | インチによる英制長さ単位 |
+| `{BOARD}` | 基板外形 |
+| `{STACKUP}` | 銅層と誘電体の層構成情報 |
+| `{DEVICES}` | デバイス参照番号と所在層 |
+| `{PADSTACK}` | パッド/ビア スタック定義 |
+| `{NET}` | ネットオブジェクト (PIN / VIA / SEG / ARC / POLYGON) |
 
 形式の詳細については [docs/hyperlynx-file-format.md](./docs/hyperlynx-file-format.md) を参照してください。
 
-## プロジェクト構成
+## 互換性と制限事項
+
+- EasyEDA Pro 3.2.0 以降が必要
+- エクスポート前に PCB 文書を保存し、必要な銅層情報が含まれていることを確認してください
+- 複雑な基板外形の円弧は線分に離散化されます
+- 未対応のパッド形状は楕円/円で近似されます
+- 基板内の切り欠き/スロット情報はエクスポートされない場合があります
+- PADS または HyperLynx へインポート後、主要寸法を確認することを推奨します
+
+## プロジェクト構成（開発者向け）
 
 ```text
 src/
-├── index.ts          # 拡張機能のエントリポイントとエクスポートコマンド
-├── types.ts          # 型定義と層定数
-├── utils.ts          # 単位換算、パッド解析、円弧計算などのユーティリティ
-├── collect.ts        # EasyEDA Pro API から PCB データを収集
-├── generate.ts       # 各セクションを組み立てて .hyp テキストを生成
-└── writers/
-    ├── board.ts      # {BOARD} 外形出力
-    ├── stackup.ts    # {STACKUP} 積層出力
-    ├── devices.ts    # {DEVICES} デバイス出力
-    ├── padstacks.ts  # {PADSTACK} パッドスタック出力
-    └── nets.ts       # {NET} ネットオブジェクト出力
+├── index.ts    # 拡張機能エントリとエクスポートコマンド
+├── collect.ts  # PCB データ収集
+├── generate.ts # .hyp ファイル生成
+├── types.ts    # 型定義
+├── utils.ts    # ユーティリティ関数
+└── writers/    # 各セクションの出力実装
+    ├── board.ts
+    ├── stackup.ts
+    ├── devices.ts
+    ├── padstacks.ts
+    └── nets.ts
 ```
-
-## 実装上のポイント
-
-- ボード外形は `layer 11`（ボード外形層）から読み取り、円弧は線分に多角形近似されます。
-- パッド形状とドリルは EasyEDA が返すタプル形式から解析され、楕円/矩形/角丸矩形/正多角形の近似に対応します。
-- スルーホールと SMD パッドは、`MULTI` 層（layer 12）にあるかどうかで判定されます。
-- パッドスタックの重複排除では、形状 ID、サイズ、角度、ドリル、層セット、スルーホールフラグを総合的に比較し、異なる層のパッドが誤って共有可能になるのを防ぎます。
-- 重複排除ロジックは KiCad の HyperLynx エクスポーター実装と整合し、互換性を保っています。
-- 円弧配線はネットセクション内で `ARC` として出力され、円心と半径は反時計回り方向に正規化されます。
 
 ## 開発
 
@@ -70,7 +72,13 @@ npm install
 npm run build
 ```
 
-生成された拡張パッケージは `./build/dist/export-hyperlynx_v1.0.0.eext` にあり、EasyEDA Pro にインストールできます。
+拡張パッケージの生成場所：
+
+```text
+./build/dist/export-hyperlynx_v1.0.0.eext
+```
+
+生成された `.eext` パッケージを EasyEDA Pro にインストールしてください。
 
 ## オープンソースライセンス
 

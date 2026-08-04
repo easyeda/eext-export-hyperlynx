@@ -4,64 +4,66 @@
 
 嘉立創EDA (EasyEDA) 專業版擴展 — 將 PCB 設計匯出為 HyperLynx (.hyp) 檔案格式，用於信號完整性模擬分析。
 
-## 功能
+## 功能特點
 
-- 匯出 PCB 板框 (`BOARD`)
-- 匯出層疊結構 (`STACKUP`)，包含銅箔層與介質層
-- 匯出器件資訊 (`DEVICES`)
-- 匯出焊盤定義 (`PADSTACK`)，自動去重
-- 匯出網路資訊 (`NET`)，包含引腳 (`PIN`)、過孔 (`VIA`)、走線 (`SEG`)、圓弧 (`ARC`)
-- 自動處理無網路物件：每個未連接物件單獨歸入 `EmptyNet<N>`
-- 座標自動轉換：EasyEDA 內部單位 (mil) → 英吋 (inch)，Y 軸取反
-- 相容 HyperLynx v2.14 格式
+- 將目前 PCB 文件匯出為 HyperLynx 2.14 格式 `.hyp` 檔案
+- 匯出內容包含：
+  - 板框輪廓 (`BOARD`)
+  - 層疊結構 (`STACKUP`)，包含銅箔層與介質層
+  - 器件資訊 (`DEVICES`)
+  - 焊盤/過孔堆疊 (`PADSTACK`)
+  - 網路資料 (`NET`)：引腳 (`PIN`)、過孔 (`VIA`)、走線 (`SEG`)、圓弧 (`ARC`)、鋪銅多邊形 (`POLYGON`)
+- 自動處理未連接物件，避免資料遺失
+- 座標自動 mil 轉換為英吋，保持與 HyperLynx 座標系一致
+- 透過頂部選單一鍵匯出
 
 ## 使用方法
 
 1. 在嘉立創EDA專業版中開啟一個 PCB 文件
-2. 點擊選單 **Export HyperLynx → Export HyperLynx (.hyp)...**
-3. 自動生成並下載 `.hyp` 檔案
+2. 點擊頂部選單 **Export HyperLynx → Export HyperLynx (.hyp)...**
+3. 在彈出的儲存對話框中選擇位置，生成 `.hyp` 檔案
 
-## 匯出格式
+## 匯出檔案說明
 
-生成的 `.hyp` 檔案遵循 HyperLynx 2.14 格式規範，包含以下節：
+生成的 `.hyp` 檔案遵循 HyperLynx 2.14 ASCII 格式規範，主要包含以下節：
 
-| 節 | 描述 |
-|---|------|
-| `{VERSION}` | 版本資訊 (2.14) |
-| `{UNITS}` | 單位 (ENGLISH LENGTH / 英吋) |
-| `{BOARD}` | 板框輪廓 (PERIMETER_SEGMENT) |
-| `{STACKUP}` | 層疊定義 (SIGNAL + DIELECTRIC) |
-| `{DEVICES}` | 器件列表 (REF + Layer) |
-| `{PADSTACK}` | 焊盤堆疊定義 |
-| `{NET}` | 網路資料 (PIN / VIA / SEG / ARC) |
+| 節 | 內容 |
+|----|------|
+| `{VERSION}` | 格式版本 2.14 |
+| `{UNITS}` | 英制長度單位（英吋） |
+| `{BOARD}` | 板框輪廓 |
+| `{STACKUP}` | 銅與介質層疊資訊 |
+| `{DEVICES}` | 器件位號與所在層 |
+| `{PADSTACK}` | 焊盤與過孔堆疊定義 |
+| `{NET}` | 網路物件（PIN / VIA / SEG / ARC / POLYGON） |
 
-更多格式細節請參考 [docs/hyperlynx-file-format.md](./docs/hyperlynx-file-format.md)。
+更多格式細節可參考 [docs/hyperlynx-file-format.md](./docs/hyperlynx-file-format.md)。
 
-## 專案結構
+## 相容性與限制
+
+- 需要嘉立創EDA專業版（EasyEDA Pro）3.2.0 及以上版本
+- 匯出前請確保 PCB 文件已儲存，並且包含所需的銅層資訊
+- 複雜板框中的圓弧會被離散為線段
+- 不支援的焊盤形狀將按橢圓/圓形近似
+- 板內挖空、開槽等資訊可能無法匯出
+- 建議匯入 PADS 或 HyperLynx 後核對關鍵尺寸
+
+## 專案結構（開發者參考）
 
 ```text
 src/
-├── index.ts          # 擴展入口與匯出命令
-├── types.ts          # 型別定義與層常數
-├── utils.ts          # 單位轉換、焊盤解析、圓弧計算等工具函式
-├── collect.ts        # 從 EasyEDA Pro API 收集 PCB 資料
-├── generate.ts       # 組裝各節並生成 .hyp 文字
-└── writers/
-    ├── board.ts      # {BOARD} 板框輸出
-    ├── stackup.ts    # {STACKUP} 層疊輸出
-    ├── devices.ts    # {DEVICES} 器件輸出
-    ├── padstacks.ts  # {PADSTACK} 焊盤堆疊輸出
-    └── nets.ts       # {NET} 網路物件輸出
+├── index.ts    # 擴展入口與匯出命令
+├── collect.ts  # PCB 資料收集
+├── generate.ts # .hyp 檔案生成
+├── types.ts    # 型別定義
+├── utils.ts    # 工具函式
+└── writers/    # 各節輸出實作
+    ├── board.ts
+    ├── stackup.ts
+    ├── devices.ts
+    ├── padstacks.ts
+    └── nets.ts
 ```
-
-## 實作要點
-
-- 板框從 `layer 11`（板框層）讀取，圓弧會被多邊形化為線段。
-- 焊盤形狀與鑽孔按 EasyEDA 回傳的元組格式解析，支援橢圓/矩形/圓角矩形/正多邊形近似。
-- 通孔與 SMD 焊盤透過是否位於 `MULTI` 層（layer 12）判斷。
-- 焊盤堆疊去重綜合考慮形狀 ID、尺寸、角度、鑽孔、層集合及通孔標誌，避免不同層焊盤被錯誤複用。
-- 去重邏輯參考 KiCad HyperLynx 匯出器實現，保證相容性。
-- 圓弧走線在網路節中輸出為 `ARC`，圓心、半徑按逆時針方向整理。
 
 ## 開發
 
@@ -70,7 +72,13 @@ npm install
 npm run build
 ```
 
-生成的擴展包位於 `./build/dist/export-hyperlynx_v1.0.0.eext`，可在嘉立創EDA專業版中安裝。
+擴展包生成位置：
+
+```text
+./build/dist/export-hyperlynx_v1.0.0.eext
+```
+
+可在嘉立創EDA專業版中安裝該擴展包。
 
 ## 開源許可
 

@@ -99,7 +99,11 @@ export interface PourPolygonInfo {
 	net: string;
 	layer: number;
 	lineWidth: number;
+	/** 覆铜边框（T=POUR），单位 mil */
+	boundary: PolygonSegment[];
+	/** 铜填充外轮廓（T=COPPER），单位 mil */
 	outline: PolygonSegment[];
+	/** 铜填充挖空区域（POLYVOID），单位 mil */
 	holes: PolygonSegment[][];
 }
 

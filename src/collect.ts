@@ -6,6 +6,7 @@ import type {
 	LayerInfo,
 	PadExportInfo,
 	PadStackEntry,
+	PolygonSegment,
 	PourPolygonInfo,
 	TraceInfo,
 	ViaInfo,
@@ -112,11 +113,45 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 	const pours = await eda.pcb_PrimitivePour.getAll();
 	const poured = await eda.pcb_PrimitivePoured.getAll();
 
-	const meta = new Map<string, { net: string; layer: number }>();
+	// 把「0.01 inch 单位」的源数组换算为 mil 的线段序列。
+	function scale(src: Array<string | number>): PolygonSegment[] {
+		return parsePolygonSourceSegments(src).map((seg) => {
+			if (seg.type === 'line') {
+				return {
+					type: 'line' as const,
+					x1: seg.x1 * POUR_UNIT_TO_MIL,
+					y1: seg.y1 * POUR_UNIT_TO_MIL,
+					x2: seg.x2 * POUR_UNIT_TO_MIL,
+					y2: seg.y2 * POUR_UNIT_TO_MIL,
+				};
+			}
+			return {
+				type: 'arc' as const,
+				x1: seg.x1 * POUR_UNIT_TO_MIL,
+				y1: seg.y1 * POUR_UNIT_TO_MIL,
+				x2: seg.x2 * POUR_UNIT_TO_MIL,
+				y2: seg.y2 * POUR_UNIT_TO_MIL,
+				cx: seg.cx * POUR_UNIT_TO_MIL,
+				cy: seg.cy * POUR_UNIT_TO_MIL,
+				radius: seg.radius * POUR_UNIT_TO_MIL,
+				ccw: seg.ccw,
+			};
+		});
+	}
+
+	// 覆铜边框源为 mil 单位，直接解析。
+	function parseBoundary(src: Array<string | number>): PolygonSegment[] {
+		return parsePolygonSourceSegments(src);
+	}
+
+	const meta = new Map<string, { net: string; layer: number; boundary: PolygonSegment[] }>();
 	for (const p of pours) {
+		const raw = p.getState_ComplexPolygon().getSource();
+		const src = Array.isArray(raw[0]) ? raw[0] : raw;
 		meta.set(p.getState_PrimitiveId(), {
 			net: p.getState_Net() || '',
 			layer: p.getState_Layer() as number,
+			boundary: parseBoundary(src),
 		});
 	}
 
@@ -129,31 +164,7 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 		for (const fill of fillGroup.getState_PourFills()) {
 			const sources = fill.path.getSourceStrictComplex();
 			const rings = sources
-				.map((src) => {
-					const segs = parsePolygonSourceSegments(src);
-					return segs.map((seg) => {
-						if (seg.type === 'line') {
-							return {
-								type: 'line' as const,
-								x1: seg.x1 * POUR_UNIT_TO_MIL,
-								y1: seg.y1 * POUR_UNIT_TO_MIL,
-								x2: seg.x2 * POUR_UNIT_TO_MIL,
-								y2: seg.y2 * POUR_UNIT_TO_MIL,
-							};
-						}
-						return {
-							type: 'arc' as const,
-							x1: seg.x1 * POUR_UNIT_TO_MIL,
-							y1: seg.y1 * POUR_UNIT_TO_MIL,
-							x2: seg.x2 * POUR_UNIT_TO_MIL,
-							y2: seg.y2 * POUR_UNIT_TO_MIL,
-							cx: seg.cx * POUR_UNIT_TO_MIL,
-							cy: seg.cy * POUR_UNIT_TO_MIL,
-							radius: seg.radius * POUR_UNIT_TO_MIL,
-							ccw: seg.ccw,
-						};
-					});
-				})
+				.map(scale)
 				.filter(ring => ring.length >= 3);
 
 			if (rings.length === 0)
@@ -167,6 +178,7 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 				net: info.net,
 				layer: info.layer,
 				lineWidth,
+				boundary: info.boundary,
 				outline: rings[0],
 				holes: rings.slice(1),
 			});

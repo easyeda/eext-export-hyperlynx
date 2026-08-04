@@ -63,16 +63,9 @@ export function writeNetObjects(
 		if (!layerName)
 			continue;
 		const { cx, cy, radius } = computeArcCenter(arc.startX, arc.startY, arc.endX, arc.endY, arc.arcAngle);
-		let x1 = arc.startX;
-		let y1 = arc.startY;
-		let x2 = arc.endX;
-		let y2 = arc.endY;
-		// HyperLynx 约定圆弧按逆时针从起点到终点，顺时针弧需交换端点。
-		if (arc.arcAngle < 0) {
-			[x1, y1, x2, y2] = [x2, y2, x1, y1];
-		}
+		// 起点/终点按原样输出（与 PADS 参考一致），不交换端点。
 		lines.push(
-			`  (ARC X1=${coord(x1)} Y1=${coord(y1)} X2=${coord(x2)} Y2=${coord(y2)} XC=${coord(cx)} YC=${coord(cy)} R=${coord(radius)} W=${coord(arc.width)} L="${layerName}")`,
+			`  (ARC X1=${coord(arc.startX)} Y1=${coord(arc.startY)} X2=${coord(arc.endX)} Y2=${coord(arc.endY)} XC=${coord(cx)} YC=${coord(cy)} R=${coord(radius)} W=${coord(arc.width)} L="${layerName}")`,
 		);
 	}
 
@@ -82,16 +75,17 @@ export function writeNetObjects(
 		if (!layerName)
 			continue;
 
-		function writeRing(segments: PolygonSegment[], isHole: boolean): void {
+		function writeRing(segments: PolygonSegment[], type: 'pour' | 'copper' | 'hole', width: number): void {
 			if (segments.length === 0)
 				return;
 			const head = segments[0];
-			if (isHole) {
+			if (type === 'hole') {
 				lines.push(`  {POLYVOID ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`);
 			}
 			else {
+				const tag = type === 'pour' ? 'POUR' : 'COPPER';
 				lines.push(
-					`  {POLYGON T=POUR L="${layerName}" W=${coord(pour.lineWidth)} ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`,
+					`  {POLYGON T=${tag} L="${layerName}" W=${coord(width)} ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`,
 				);
 			}
 
@@ -115,9 +109,11 @@ export function writeNetObjects(
 			lines.push('  }');
 		}
 
-		writeRing(pour.outline, false);
+		// 覆铜边框输出为 T=POUR，铜填充输出为 T=COPPER，其挖空区域为 POLYVOID。
+		writeRing(pour.boundary, 'pour', pour.lineWidth);
+		writeRing(pour.outline, 'copper', 0);
 		for (const hole of pour.holes)
-			writeRing(hole, true);
+			writeRing(hole, 'hole', 0);
 
 		nextPolyId++;
 	}

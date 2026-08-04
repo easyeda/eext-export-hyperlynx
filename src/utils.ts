@@ -1,3 +1,5 @@
+import type { PolygonSegment } from './types';
+
 function mil2inch(mil: number): number {
 	return mil / 1000.0;
 }
@@ -238,6 +240,155 @@ export function parsePolygonSource(src: Array<string | number>, arcSteps = 16): 
 	}
 
 	return pts;
+}
+
+export function parsePolygonSourceSegments(src: Array<string | number>, bezierSteps = 8): PolygonSegment[] {
+	if (!Array.isArray(src) || src.length === 0)
+		return [];
+
+	const head = typeof src[0] === 'string' ? src[0].toUpperCase() : '';
+
+	function rectSegments(x: number, y: number, w: number, h: number, rotation = 0): PolygonSegment[] {
+		const corners: Point[] = [
+			{ x, y },
+			{ x: x + w, y },
+			{ x: x + w, y: y - h },
+			{ x, y: y - h },
+		];
+		if (!rotation) {
+			return [
+				{ type: 'line', x1: corners[0].x, y1: corners[0].y, x2: corners[1].x, y2: corners[1].y },
+				{ type: 'line', x1: corners[1].x, y1: corners[1].y, x2: corners[2].x, y2: corners[2].y },
+				{ type: 'line', x1: corners[2].x, y1: corners[2].y, x2: corners[3].x, y2: corners[3].y },
+				{ type: 'line', x1: corners[3].x, y1: corners[3].y, x2: corners[0].x, y2: corners[0].y },
+			];
+		}
+		const cx = x + w / 2;
+		const cy = y - h / 2;
+		const rad = rotation * (Math.PI / 180.0);
+		const cos = Math.cos(rad);
+		const sin = Math.sin(rad);
+		const rotated = corners.map((p) => {
+			const dx = p.x - cx;
+			const dy = p.y - cy;
+			return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+		});
+		const segs: PolygonSegment[] = [];
+		for (let i = 0; i < rotated.length; i++) {
+			const a = rotated[i];
+			const b = rotated[(i + 1) % rotated.length];
+			segs.push({ type: 'line', x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+		}
+		return segs;
+	}
+
+	if (head === 'R') {
+		const x = Number(src[1]);
+		const y = Number(src[2]);
+		const w = Number(src[3]);
+		const h = Number(src[4]);
+		const rotation = Number(src[5]) || 0;
+		return rectSegments(x, y, w, h, rotation);
+	}
+
+	if (head === 'CIRCLE') {
+		const cx = Number(src[1]);
+		const cy = Number(src[2]);
+		const r = Number(src[3]);
+		// Approximate circle with line segments to avoid many tiny arcs.
+		const steps = Math.max(8, Math.ceil(2 * Math.PI * r / 20));
+		const segs: PolygonSegment[] = [];
+		let px = cx + r;
+		let py = cy;
+		for (let i = 1; i <= steps; i++) {
+			const a = (i / steps) * 2 * Math.PI;
+			const x = cx + r * Math.cos(a);
+			const y = cy + r * Math.sin(a);
+			segs.push({ type: 'line', x1: px, y1: py, x2: x, y2: y });
+			px = x;
+			py = y;
+		}
+		return segs;
+	}
+
+	const segs: PolygonSegment[] = [];
+	let i = 0;
+	let lastX = 0;
+	let lastY = 0;
+	if (typeof src[0] === 'number' && typeof src[1] === 'number') {
+		lastX = Number(src[0]);
+		lastY = Number(src[1]);
+		i = 2;
+	}
+
+	let mode = 'L';
+	while (i < src.length) {
+		const token = src[i];
+		if (typeof token === 'string') {
+			mode = token.toUpperCase();
+			i++;
+			continue;
+		}
+
+		if (mode === 'ARC' || mode === 'CARC') {
+			const angle = Number(src[i]);
+			const ex = Number(src[i + 1]);
+			const ey = Number(src[i + 2]);
+			i += 3;
+			const { cx, cy, radius, ccw } = computeArcCenter(lastX, lastY, ex, ey, angle);
+			if (radius === 0 || !Number.isFinite(radius)) {
+				segs.push({ type: 'line', x1: lastX, y1: lastY, x2: ex, y2: ey });
+			}
+			else {
+				segs.push({
+					type: 'arc',
+					x1: lastX,
+					y1: lastY,
+					x2: ex,
+					y2: ey,
+					cx,
+					cy,
+					radius,
+					ccw: mode === 'ARC' ? angle >= 0 : ccw,
+				});
+			}
+			lastX = ex;
+			lastY = ey;
+		}
+		else if (mode === 'C') {
+			const c1x = Number(src[i]);
+			const c1y = Number(src[i + 1]);
+			const c2x = Number(src[i + 2]);
+			const c2y = Number(src[i + 3]);
+			const ex = Number(src[i + 4]);
+			const ey = Number(src[i + 5]);
+			i += 6;
+			const steps = bezierSteps;
+			let px = lastX;
+			let py = lastY;
+			for (let k = 1; k <= steps; k++) {
+				const t = k / steps;
+				const mt = 1 - t;
+				const x = mt * mt * mt * lastX + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * ex;
+				const y = mt * mt * mt * lastY + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * ey;
+				segs.push({ type: 'line', x1: px, y1: py, x2: x, y2: y });
+				px = x;
+				py = y;
+			}
+			lastX = ex;
+			lastY = ey;
+		}
+		else {
+			const ex = Number(src[i]);
+			const ey = Number(src[i + 1]);
+			segs.push({ type: 'line', x1: lastX, y1: lastY, x2: ex, y2: ey });
+			lastX = ex;
+			lastY = ey;
+			i += 2;
+		}
+	}
+
+	return segs;
 }
 
 export function approximateArc(

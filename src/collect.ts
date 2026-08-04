@@ -23,6 +23,7 @@ import {
 	parsePadDrill,
 	parsePadShape,
 	parsePolygonSource,
+	parsePolygonSourceSegments,
 	POUR_UNIT_TO_MIL,
 } from './utils';
 
@@ -128,19 +129,44 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 		for (const fill of fillGroup.getState_PourFills()) {
 			const sources = fill.path.getSourceStrictComplex();
 			const rings = sources
-				.map(src => parsePolygonSource(src).map(pt => ({
-					x: pt.x * POUR_UNIT_TO_MIL,
-					y: pt.y * POUR_UNIT_TO_MIL,
-				})))
+				.map((src) => {
+					const segs = parsePolygonSourceSegments(src);
+					return segs.map((seg) => {
+						if (seg.type === 'line') {
+							return {
+								type: 'line' as const,
+								x1: seg.x1 * POUR_UNIT_TO_MIL,
+								y1: seg.y1 * POUR_UNIT_TO_MIL,
+								x2: seg.x2 * POUR_UNIT_TO_MIL,
+								y2: seg.y2 * POUR_UNIT_TO_MIL,
+							};
+						}
+						return {
+							type: 'arc' as const,
+							x1: seg.x1 * POUR_UNIT_TO_MIL,
+							y1: seg.y1 * POUR_UNIT_TO_MIL,
+							x2: seg.x2 * POUR_UNIT_TO_MIL,
+							y2: seg.y2 * POUR_UNIT_TO_MIL,
+							cx: seg.cx * POUR_UNIT_TO_MIL,
+							cy: seg.cy * POUR_UNIT_TO_MIL,
+							radius: seg.radius * POUR_UNIT_TO_MIL,
+							ccw: seg.ccw,
+						};
+					});
+				})
 				.filter(ring => ring.length >= 3);
 
 			if (rings.length === 0)
 				continue;
 
+			// EasyEDA 未给出宽度时，使用 HyperLynx 常见的 1 mil 轮廓线宽。
+			const rawWidth = Number(fill.lineWidth) || 0;
+			const lineWidth = rawWidth > 0 ? rawWidth * POUR_UNIT_TO_MIL : 1;
+
 			result.push({
 				net: info.net,
 				layer: info.layer,
-				lineWidth: (fill.lineWidth || 0) * POUR_UNIT_TO_MIL,
+				lineWidth,
 				outline: rings[0],
 				holes: rings.slice(1),
 			});
@@ -228,7 +254,8 @@ export async function collectBoardData(): Promise<BoardData> {
 		padExports.push({
 			x: pad.getState_X(),
 			y: pad.getState_Y(),
-			net: owner?.net || pad.getState_Net() || '',
+			// 优先使用焊盘图元自身的网络，组件信息仅用于位号/编号。
+			net: pad.getState_Net() || owner?.net || '',
 			ref: owner?.ref || 'EMPTY',
 			padNumber,
 			padStackId: psId,

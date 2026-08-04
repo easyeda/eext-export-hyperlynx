@@ -73,14 +73,34 @@ export interface BoardOutlineSegment {
 	y2: number;
 }
 
+export interface LineSegment {
+	type: 'line';
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+}
+
+export interface ArcSegment {
+	type: 'arc';
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+	cx: number;
+	cy: number;
+	radius: number;
+	ccw: boolean;
+}
+
+export type PolygonSegment = LineSegment | ArcSegment;
+
 export interface PourPolygonInfo {
 	net: string;
 	layer: number;
 	lineWidth: number;
-	/** 外轮廓顶点（mil） */
-	outline: Array<{ x: number; y: number }>;
-	/** 挖空区域顶点（mil） */
-	holes: Array<Array<{ x: number; y: number }>>;
+	outline: PolygonSegment[];
+	holes: PolygonSegment[][];
 }
 
 export interface BoardData {

@@ -1,4 +1,4 @@
-import type { ArcInfo, LayerInfo, PadExportInfo, PourPolygonInfo, TraceInfo, ViaInfo } from '../types';
+import type { ArcInfo, LayerInfo, PadExportInfo, PolygonSegment, PourPolygonInfo, TraceInfo, ViaInfo } from '../types';
 import { computeArcCenter, coord, sanitizeLayerName } from '../utils';
 
 export interface NetObjects {
@@ -82,26 +82,42 @@ export function writeNetObjects(
 		if (!layerName)
 			continue;
 
-		const ring = pour.outline;
-		const head = ring[0];
-		lines.push(
-			`  {POLYGON T=POUR L="${layerName}" W=${coord(pour.lineWidth)} ID=${nextPolyId} X=${coord(head.x)} Y=${coord(head.y)}`,
-		);
-		for (const pt of ring) {
-			lines.push(`    (LINE X=${coord(pt.x)} Y=${coord(pt.y)})`);
-		}
-		lines.push(`    (LINE X=${coord(head.x)} Y=${coord(head.y)})`);
-		lines.push('  }');
-
-		for (const hole of pour.holes) {
-			const hHead = hole[0];
-			lines.push(`  {POLYVOID ID=${nextPolyId} X=${coord(hHead.x)} Y=${coord(hHead.y)}`);
-			for (const pt of hole) {
-				lines.push(`    (LINE X=${coord(pt.x)} Y=${coord(pt.y)})`);
+		function writeRing(segments: PolygonSegment[], isHole: boolean): void {
+			if (segments.length === 0)
+				return;
+			const head = segments[0];
+			if (isHole) {
+				lines.push(`  {POLYVOID ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`);
 			}
-			lines.push(`    (LINE X=${coord(hHead.x)} Y=${coord(hHead.y)})`);
+			else {
+				lines.push(
+					`  {POLYGON T=POUR L="${layerName}" W=${coord(pour.lineWidth)} ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`,
+				);
+			}
+
+			for (const seg of segments) {
+				if (seg.type === 'arc') {
+					lines.push(
+						`    (CURVE X1=${coord(seg.x1)} Y1=${coord(seg.y1)} X2=${coord(seg.x2)} Y2=${coord(seg.y2)} XC=${coord(seg.cx)} YC=${coord(seg.cy)} R=${coord(seg.radius)})`,
+					);
+				}
+				else {
+					lines.push(`    (LINE X=${coord(seg.x2)} Y=${coord(seg.y2)})`);
+				}
+			}
+
+			// Close the ring if it isn't already.
+			const tail = segments[segments.length - 1];
+			const closed = Math.abs(tail.x2 - head.x1) < 1e-9 && Math.abs(tail.y2 - head.y1) < 1e-9;
+			if (!closed)
+				lines.push(`    (LINE X=${coord(head.x1)} Y=${coord(head.y1)})`);
+
 			lines.push('  }');
 		}
+
+		writeRing(pour.outline, false);
+		for (const hole of pour.holes)
+			writeRing(hole, true);
 
 		nextPolyId++;
 	}

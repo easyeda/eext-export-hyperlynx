@@ -17,4 +17,6 @@
 /tsconfig.json
 .eslintcache
 debug.log
-iframe/
+/iframe/
+/.github/
+/docs/

@@ -1,12 +1,13 @@
 import type { BoardData } from './types';
+import type { NetObjects } from './writers/nets';
 import { writeBoardOutline } from './writers/board';
 import { writeDevices } from './writers/devices';
-import { writeNetObject, writeNetObjects } from './writers/nets';
+import { createNetObjects, writeNetObjects } from './writers/nets';
 import { writePadStacks } from './writers/padstacks';
 import { writeStackup } from './writers/stackup';
 
 export function generateHypContent(data: BoardData, boardName: string): string {
-	const { copperLayers, nets, components, vias, traces, arcs, padStacks, padExports, outlineSegments } = data;
+	const { copperLayers, nets, components, vias, traces, arcs, padStacks, padExports, outlineSegments, pours } = data;
 	const lines: string[] = [];
 
 	lines.push('{VERSION=2.14}');
@@ -26,35 +27,48 @@ export function generateHypContent(data: BoardData, boardName: string): string {
 	writeDevices(lines, components, copperLayers);
 	writePadStacks(lines, padStacks, copperLayers);
 
-	for (const netName of nets) {
-		if (!netName)
-			continue;
-		const netPins = padExports.filter(p => p.net === netName);
-		const netVias = vias.filter(v => v.net === netName);
-		const netTraces = traces.filter(t => t.net === netName);
-		const netArcs = arcs.filter(a => a.net === netName);
-		writeNetObjects(lines, netName, netPins, netVias, netTraces, netArcs, copperLayers);
+	// 按网络归组，未命名网络的对象单独归入 EmptyNet<N>。
+	const byNet = new Map<string, NetObjects>();
+	const orphans: NetObjects[] = [];
+
+	const bucketOf = (net: string): NetObjects => {
+		if (!net) {
+			const fresh = createNetObjects();
+			orphans.push(fresh);
+			return fresh;
+		}
+		let bucket = byNet.get(net);
+		if (!bucket) {
+			bucket = createNetObjects();
+			byNet.set(net, bucket);
+		}
+		return bucket;
+	};
+
+	for (const pin of padExports) bucketOf(pin.net).pins.push(pin);
+	for (const via of vias) bucketOf(via.net).vias.push(via);
+	for (const trace of traces) bucketOf(trace.net).traces.push(trace);
+	for (const arc of arcs) bucketOf(arc.net).arcs.push(arc);
+	for (const pour of pours) bucketOf(pour.net).pours.push(pour);
+
+	// POLYGON 的 ID 在整个文件内唯一，从 1 开始递增。
+	let polyId = 1;
+
+	const orderedNets = [...nets.filter(n => n && byNet.has(n))];
+	for (const net of byNet.keys()) {
+		if (!orderedNets.includes(net))
+			orderedNets.push(net);
 	}
 
-	// Export unconnected objects each in their own EmptyNet section.
-	const nullPins = padExports.filter(p => !p.net);
-	const nullVias = vias.filter(v => !v.net);
-	const nullTraces = traces.filter(t => !t.net);
-	const nullArcs = arcs.filter(a => !a.net);
+	for (const netName of orderedNets) {
+		polyId = writeNetObjects(lines, netName, byNet.get(netName)!, copperLayers, polyId);
+	}
+
 	let emptyNetIdx = 0;
-	for (const pin of nullPins) {
-		writeNetObject(lines, `EmptyNet${emptyNetIdx++}`, pin, null, null, null, copperLayers);
-	}
-	for (const via of nullVias) {
-		writeNetObject(lines, `EmptyNet${emptyNetIdx++}`, null, via, null, null, copperLayers);
-	}
-	for (const trace of nullTraces) {
-		writeNetObject(lines, `EmptyNet${emptyNetIdx++}`, null, null, trace, null, copperLayers);
-	}
-	for (const arc of nullArcs) {
-		writeNetObject(lines, `EmptyNet${emptyNetIdx++}`, null, null, null, arc, copperLayers);
+	for (const bucket of orphans) {
+		polyId = writeNetObjects(lines, `EmptyNet${emptyNetIdx++}`, bucket, copperLayers, polyId);
 	}
 
 	lines.push('{END}');
-	return lines.join('\n');
+	return `${lines.join('\n')}\n`;
 }

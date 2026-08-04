@@ -1,5 +1,5 @@
 import type { BoardOutlineSegment } from '../types';
-import { fmt } from '../utils';
+import { coord } from '../utils';
 
 type PrimitivePoint = { x: number; y: number } | { startX: number; startY: number; endX: number; endY: number };
 
@@ -14,12 +14,12 @@ export function writeBoardOutline(
 	if (outlineSegments.length > 0) {
 		for (const seg of outlineSegments) {
 			lines.push(
-				`  (PERIMETER_SEGMENT X1=${fmt(seg.x1, 9)} Y1=${fmt(-seg.y1, 9)} X2=${fmt(seg.x2, 9)} Y2=${fmt(-seg.y2, 9)})`,
+				`  (PERIMETER_SEGMENT X1=${coord(seg.x1)} Y1=${coord(seg.y1)} X2=${coord(seg.x2)} Y2=${coord(seg.y2)})`,
 			);
 		}
 	}
 	else {
-		// Fallback: use a bounding box expanded by a margin.
+		// 板框层为空时退化为图元包围盒，保证文件仍可被读取。
 		let minX = Infinity;
 		let minY = Infinity;
 		let maxX = -Infinity;
@@ -49,10 +49,10 @@ export function writeBoardOutline(
 		const y1 = minY - margin;
 		const x2 = maxX + margin;
 		const y2 = maxY + margin;
-		lines.push(`  (PERIMETER_SEGMENT X1=${fmt(x1, 9)} Y1=${fmt(-y1, 9)} X2=${fmt(x2, 9)} Y2=${fmt(-y1, 9)})`);
-		lines.push(`  (PERIMETER_SEGMENT X1=${fmt(x2, 9)} Y1=${fmt(-y1, 9)} X2=${fmt(x2, 9)} Y2=${fmt(-y2, 9)})`);
-		lines.push(`  (PERIMETER_SEGMENT X1=${fmt(x2, 9)} Y1=${fmt(-y2, 9)} X2=${fmt(x1, 9)} Y2=${fmt(-y2, 9)})`);
-		lines.push(`  (PERIMETER_SEGMENT X1=${fmt(x1, 9)} Y1=${fmt(-y2, 9)} X2=${fmt(x1, 9)} Y2=${fmt(-y1, 9)})`);
+		lines.push(`  (PERIMETER_SEGMENT X1=${coord(x1)} Y1=${coord(y1)} X2=${coord(x2)} Y2=${coord(y1)})`);
+		lines.push(`  (PERIMETER_SEGMENT X1=${coord(x2)} Y1=${coord(y1)} X2=${coord(x2)} Y2=${coord(y2)})`);
+		lines.push(`  (PERIMETER_SEGMENT X1=${coord(x2)} Y1=${coord(y2)} X2=${coord(x1)} Y2=${coord(y2)})`);
+		lines.push(`  (PERIMETER_SEGMENT X1=${coord(x1)} Y1=${coord(y2)} X2=${coord(x1)} Y2=${coord(y1)})`);
 	}
 
 	lines.push('}');

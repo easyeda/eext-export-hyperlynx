@@ -1,13 +1,29 @@
-export function mil2inch(mil: number): number {
+function mil2inch(mil: number): number {
 	return mil / 1000.0;
 }
 
-export function fmt(value: number, decimals: number): string {
-	return mil2inch(value).toFixed(decimals);
+/**
+ * 覆铜填充路径的坐标单位为 0.01 inch，与其它图元的 mil 不一致，需换算。
+ */
+export const POUR_UNIT_TO_MIL = 10;
+
+/**
+ * 坐标与尺寸的输出精度。
+ *
+ * EasyEDA 的 mil 数值最多带 4 位小数（如 826.7717），换算为英寸需 7 位小数才不丢精度。
+ */
+const COORD_DECIMALS = 7;
+
+/** 将 mil 数值格式化为英寸字符串。 */
+export function coord(mil: number): string {
+	return mil2inch(mil).toFixed(COORD_DECIMALS);
 }
 
+/**
+ * HyperLynx 层名被双引号包裹，允许空格，仅需去掉引号并截断到 20 字符。
+ */
 export function sanitizeLayerName(name: string): string {
-	return name.replace(/[^\w.]/g, '_').substring(0, 20);
+	return name.replace(/["\r\n]/g, '').trim().substring(0, 20);
 }
 
 export function arraysEqual(a: number[], b: number[]): boolean {
@@ -20,11 +36,15 @@ export function arraysEqual(a: number[], b: number[]): boolean {
 	return true;
 }
 
+/**
+ * 归一化焊盘旋转角到 [0, 360)。
+ *
+ * KiCad 用 `180 - angle` 是为了补偿其 Y 轴翻转；EasyEDA 数据层 Y 轴与 HyperLynx 同向，
+ * 不做翻转，因此不能再做镜像换算，否则角度会与源数据不符。
+ */
 export function normalizeAngle(rotation: number): number {
-	let angle = 180.0 - rotation;
-	while (angle < 0.0) angle += 360.0;
-	while (angle >= 360.0) angle -= 360.0;
-	return angle;
+	const angle = rotation % 360.0;
+	return angle < 0.0 ? angle + 360.0 : angle;
 }
 
 export function parsePadShape(padShape: unknown): { sx: number; sy: number; shapeId: number } {
@@ -98,6 +118,126 @@ export function computeArcCenter(
 		radius,
 		ccw,
 	};
+}
+
+export interface Point {
+	x: number;
+	y: number;
+}
+
+/**
+ * 解析 EasyEDA 单多边形源数组为顶点序列，圆弧与贝塞尔曲线会被离散化。
+ *
+ * 源数组格式见 TPCB_PolygonSourceArray：支持 L / ARC / CARC / C 模式，
+ * 以及 R（矩形，x,y 为左上点）与 CIRCLE 两种整体形状。
+ */
+export function parsePolygonSource(src: Array<string | number>, arcSteps = 16): Point[] {
+	if (!Array.isArray(src) || src.length === 0)
+		return [];
+
+	const head = typeof src[0] === 'string' ? src[0].toUpperCase() : '';
+
+	if (head === 'R') {
+		const x = Number(src[1]);
+		const y = Number(src[2]);
+		const w = Number(src[3]);
+		const h = Number(src[4]);
+		const rotation = Number(src[5]) || 0;
+		const corners: Point[] = [
+			{ x, y },
+			{ x: x + w, y },
+			{ x: x + w, y: y - h },
+			{ x, y: y - h },
+		];
+		if (!rotation)
+			return corners;
+		const cx = x + w / 2;
+		const cy = y - h / 2;
+		const rad = rotation * (Math.PI / 180.0);
+		const cos = Math.cos(rad);
+		const sin = Math.sin(rad);
+		return corners.map((p) => {
+			const dx = p.x - cx;
+			const dy = p.y - cy;
+			return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+		});
+	}
+
+	if (head === 'CIRCLE') {
+		const cx = Number(src[1]);
+		const cy = Number(src[2]);
+		const r = Number(src[3]);
+		const steps = Math.max(arcSteps, 8) * 2;
+		const pts: Point[] = [];
+		for (let i = 0; i < steps; i++) {
+			const a = (i / steps) * 2 * Math.PI;
+			pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+		}
+		return pts;
+	}
+
+	const pts: Point[] = [];
+	let i = 0;
+	if (typeof src[0] === 'number' && typeof src[1] === 'number') {
+		pts.push({ x: Number(src[0]), y: Number(src[1]) });
+		i = 2;
+	}
+
+	let mode = 'L';
+	while (i < src.length) {
+		const token = src[i];
+		if (typeof token === 'string') {
+			mode = token.toUpperCase();
+			i++;
+			continue;
+		}
+
+		const last = pts[pts.length - 1];
+
+		if (mode === 'ARC' || mode === 'CARC') {
+			const angle = Number(src[i]);
+			const ex = Number(src[i + 1]);
+			const ey = Number(src[i + 2]);
+			i += 3;
+			if (last) {
+				const arcPts = approximateArc(last.x, last.y, ex, ey, angle, arcSteps);
+				for (let k = 1; k < arcPts.length; k++)
+					pts.push(arcPts[k]);
+			}
+			else {
+				pts.push({ x: ex, y: ey });
+			}
+		}
+		else if (mode === 'C') {
+			const c1x = Number(src[i]);
+			const c1y = Number(src[i + 1]);
+			const c2x = Number(src[i + 2]);
+			const c2y = Number(src[i + 3]);
+			const ex = Number(src[i + 4]);
+			const ey = Number(src[i + 5]);
+			i += 6;
+			if (last) {
+				const steps = 8;
+				for (let k = 1; k <= steps; k++) {
+					const t = k / steps;
+					const mt = 1 - t;
+					pts.push({
+						x: mt * mt * mt * last.x + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * ex,
+						y: mt * mt * mt * last.y + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * ey,
+					});
+				}
+			}
+			else {
+				pts.push({ x: ex, y: ey });
+			}
+		}
+		else {
+			pts.push({ x: Number(src[i]), y: Number(src[i + 1]) });
+			i += 2;
+		}
+	}
+
+	return pts;
 }
 
 export function approximateArc(

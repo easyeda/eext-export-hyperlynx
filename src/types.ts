@@ -73,6 +73,16 @@ export interface BoardOutlineSegment {
 	y2: number;
 }
 
+export interface PourPolygonInfo {
+	net: string;
+	layer: number;
+	lineWidth: number;
+	/** 外轮廓顶点（mil） */
+	outline: Array<{ x: number; y: number }>;
+	/** 挖空区域顶点（mil） */
+	holes: Array<Array<{ x: number; y: number }>>;
+}
+
 export interface BoardData {
 	copperLayers: LayerInfo[];
 	nets: string[];
@@ -83,12 +93,23 @@ export interface BoardData {
 	padStacks: PadStackEntry[];
 	padExports: PadExportInfo[];
 	outlineSegments: BoardOutlineSegment[];
+	pours: PourPolygonInfo[];
 }
 
 export const LAYER_TOP = 1;
 export const LAYER_BOTTOM = 2;
 export const LAYER_BOARD_OUTLINE = 11;
 export const LAYER_MULTI = 12;
+export const LAYER_INNER_1 = 15;
+
+/** 物理层叠顺序：顶层 → 内层 1..30 → 底层 */
+export function copperStackIndex(layerId: number): number {
+	if (layerId === LAYER_TOP)
+		return 0;
+	if (layerId === LAYER_BOTTOM)
+		return Number.MAX_SAFE_INTEGER;
+	return layerId - LAYER_INNER_1 + 1;
+}
 
 export const COPPER_LAYER_IDS = [
 	LAYER_TOP,

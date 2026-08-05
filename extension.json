@@ -3,7 +3,7 @@
 	"uuid": "a5375a120c004b379e5c4456c4521760",
 	"displayName": "导出HyperLynx",
 	"description": "导出 PCB 为 HyperLynx (.hyp) 格式文件，便于进行信号完整性分析。",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"publisher": "EasyEDA",
 	"engines": {
 		"eda": "^3.2.0"

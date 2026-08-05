@@ -95,6 +95,15 @@ export interface ArcSegment {
 
 export type PolygonSegment = LineSegment | ArcSegment;
 
+/** 热焊辐条：连接焊盘与铜填充外轮廓的开放线段，单位 mil */
+export interface PourSpoke {
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+	width: number;
+}
+
 export interface PourPolygonInfo {
 	net: string;
 	layer: number;
@@ -105,6 +114,8 @@ export interface PourPolygonInfo {
 	outline: PolygonSegment[];
 	/** 铜填充挖空区域（POLYVOID），单位 mil */
 	holes: PolygonSegment[][];
+	/** 热焊辐条（输出为布线 SEG），单位 mil */
+	spokes: PourSpoke[];
 }
 
 export interface BoardData {

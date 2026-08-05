@@ -8,6 +8,7 @@ import type {
 	PadStackEntry,
 	PolygonSegment,
 	PourPolygonInfo,
+	PourSpoke,
 	TraceInfo,
 	ViaInfo,
 } from './types';
@@ -161,26 +162,51 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 		if (!info || !copperLayerIds.includes(info.layer))
 			continue;
 
-		for (const fill of fillGroup.getState_PourFills()) {
-			const sources = fill.path.getSourceStrictComplex();
-			const rings = sources
-				.map(scale)
-				.filter(ring => ring.length >= 3);
+		const fills = fillGroup.getState_PourFills();
+		const spokes: PourSpoke[] = [];
+		const mainFills: Array<{ outline: PolygonSegment[]; holes: PolygonSegment[][]; lineWidth: number }> = [];
 
-			if (rings.length === 0)
-				continue;
+		for (const fill of fills) {
+			const rings = fill.path
+				.getSourceStrictComplex()
+				.map(scale);
 
 			// EasyEDA 未给出宽度时，使用 HyperLynx 常见的 1 mil 轮廓线宽。
 			const rawWidth = Number(fill.lineWidth) || 0;
 			const lineWidth = rawWidth > 0 ? rawWidth * POUR_UNIT_TO_MIL : 1;
 
+			// 热焊辐条是开放的 1 段线段（fill=false），需单独收集，否则会被按闭合环过滤丢弃。
+			const closedRings = rings.filter(ring => ring.length >= 3);
+			if (closedRings.length === 0) {
+				for (const ring of rings) {
+					for (const seg of ring) {
+						// 辐条为直线；若出现圆弧则近似为直线段。
+						if (seg.type === 'arc') {
+							const pts = approximateArc(seg.x1, seg.y1, seg.x2, seg.y2, seg.ccw ? 1 : -1);
+							for (let i = 0; i < pts.length - 1; i++) {
+								spokes.push({ x1: pts[i].x, y1: pts[i].y, x2: pts[i + 1].x, y2: pts[i + 1].y, width: lineWidth });
+							}
+						}
+						else {
+							spokes.push({ x1: seg.x1, y1: seg.y1, x2: seg.x2, y2: seg.y2, width: lineWidth });
+						}
+					}
+				}
+				continue;
+			}
+
+			mainFills.push({ outline: closedRings[0], holes: closedRings.slice(1), lineWidth });
+		}
+
+		for (const mf of mainFills) {
 			result.push({
 				net: info.net,
 				layer: info.layer,
-				lineWidth,
+				lineWidth: mf.lineWidth,
 				boundary: info.boundary,
-				outline: rings[0],
-				holes: rings.slice(1),
+				outline: mf.outline,
+				holes: mf.holes,
+				spokes,
 			});
 		}
 	}

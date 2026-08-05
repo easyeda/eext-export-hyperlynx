@@ -75,17 +75,17 @@ export function writeNetObjects(
 		if (!layerName)
 			continue;
 
-		function writeRing(segments: PolygonSegment[], type: 'pour' | 'copper' | 'hole', width: number): void {
+		function writeRing(segments: PolygonSegment[], type: 'pour' | 'copper' | 'hole', width: number, id: number): void {
 			if (segments.length === 0)
 				return;
 			const head = segments[0];
 			if (type === 'hole') {
-				lines.push(`  {POLYVOID ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`);
+				lines.push(`  {POLYVOID ID=${id} X=${coord(head.x1)} Y=${coord(head.y1)}`);
 			}
 			else {
 				const tag = type === 'pour' ? 'POUR' : 'COPPER';
 				lines.push(
-					`  {POLYGON T=${tag} L="${layerName}" W=${coord(width)} ID=${nextPolyId} X=${coord(head.x1)} Y=${coord(head.y1)}`,
+					`  {POLYGON T=${tag} L="${layerName}" W=${coord(width)} ID=${id} X=${coord(head.x1)} Y=${coord(head.y1)}`,
 				);
 			}
 
@@ -109,11 +109,21 @@ export function writeNetObjects(
 			lines.push('  }');
 		}
 
-		// 覆铜边框输出为 T=POUR，铜填充输出为 T=COPPER，其挖空区域为 POLYVOID。
-		writeRing(pour.boundary, 'pour', pour.lineWidth);
-		writeRing(pour.outline, 'copper', 0);
+		// POLYGON 记录（POUR/COPPER）的 ID 在整个文件内必须唯一；
+		// POLYVOID 复用其所属 COPPER 的 ID，从而在铜填充上镂空出热焊圆环。
+		const pourId = nextPolyId++;
+		const copperId = nextPolyId++;
+		writeRing(pour.boundary, 'pour', pour.lineWidth, pourId);
+		writeRing(pour.outline, 'copper', 0, copperId);
 		for (const hole of pour.holes)
-			writeRing(hole, 'hole', 0);
+			writeRing(hole, 'hole', 0, copperId);
+
+		// 热焊辐条输出为布线段，与走线一致。
+		for (const spoke of pour.spokes) {
+			lines.push(
+				`  (SEG X1=${coord(spoke.x1)} Y1=${coord(spoke.y1)} X2=${coord(spoke.x2)} Y2=${coord(spoke.y2)} W=${coord(spoke.width)} L="${layerName}")`,
+			);
+		}
 
 		nextPolyId++;
 	}

@@ -7,7 +7,7 @@ import { writePadStacks } from './writers/padstacks';
 import { writeStackup } from './writers/stackup';
 
 export function generateHypContent(data: BoardData, boardName: string): string {
-	const { copperLayers, nets, components, vias, traces, arcs, padStacks, padExports, outlineSegments, pours } = data;
+	const { copperLayers, nets, components, vias, traces, arcs, padStacks, padExports, outlineSegments, pours, fills, regions } = data;
 	const lines: string[] = [];
 
 	lines.push('{VERSION=2.14}');
@@ -50,6 +50,8 @@ export function generateHypContent(data: BoardData, boardName: string): string {
 	for (const trace of traces) bucketOf(trace.net).traces.push(trace);
 	for (const arc of arcs) bucketOf(arc.net).arcs.push(arc);
 	for (const pour of pours) bucketOf(pour.net).pours.push(pour);
+	for (const fill of fills) bucketOf(fill.net).fills.push(fill);
+	for (const region of regions) bucketOf(region.net).regions.push(region);
 
 	// POLYGON 的 ID 在整个文件内唯一，从 1 开始递增。
 	let polyId = 1;

@@ -1,4 +1,4 @@
-import type { ArcInfo, LayerInfo, PadExportInfo, PolygonSegment, PourPolygonInfo, TraceInfo, ViaInfo } from '../types';
+import type { ArcInfo, LayerInfo, PadExportInfo, PolygonFillInfo, PolygonSegment, PourPolygonInfo, TraceInfo, ViaInfo } from '../types';
 import { computeArcCenter, coord, sanitizeLayerName } from '../utils';
 
 export interface NetObjects {
@@ -7,10 +7,12 @@ export interface NetObjects {
 	traces: TraceInfo[];
 	arcs: ArcInfo[];
 	pours: PourPolygonInfo[];
+	fills: PolygonFillInfo[];
+	regions: PolygonFillInfo[];
 }
 
 export function createNetObjects(): NetObjects {
-	return { pins: [], vias: [], traces: [], arcs: [], pours: [] };
+	return { pins: [], vias: [], traces: [], arcs: [], pours: [], fills: [], regions: [] };
 }
 
 function isEmpty(objects: NetObjects): boolean {
@@ -18,7 +20,9 @@ function isEmpty(objects: NetObjects): boolean {
 		&& objects.vias.length === 0
 		&& objects.traces.length === 0
 		&& objects.arcs.length === 0
-		&& objects.pours.length === 0;
+		&& objects.pours.length === 0
+		&& objects.fills.length === 0
+		&& objects.regions.length === 0;
 }
 
 /**
@@ -62,8 +66,10 @@ export function writeNetObjects(
 		const layerName = layerNameOf(arc.layer);
 		if (!layerName)
 			continue;
-		const { cx, cy, radius } = computeArcCenter(arc.startX, arc.startY, arc.endX, arc.endY, arc.arcAngle);
-		// 起点/终点按原样输出（与 PADS 参考一致），不交换端点。
+		// EasyEDA 数据层 Y 轴与屏幕坐标一致，正角度为顺时针；
+		// HyperLynx 使用标准数学坐标系，正角度为逆时针，因此需要取反。
+		const arcAngle = -arc.arcAngle;
+		const { cx, cy, radius } = computeArcCenter(arc.startX, arc.startY, arc.endX, arc.endY, arcAngle);
 		lines.push(
 			`  (ARC X1=${coord(arc.startX)} Y1=${coord(arc.startY)} X2=${coord(arc.endX)} Y2=${coord(arc.endY)} XC=${coord(cx)} YC=${coord(cy)} R=${coord(radius)} W=${coord(arc.width)} L="${layerName}")`,
 		);
@@ -109,11 +115,9 @@ export function writeNetObjects(
 			lines.push('  }');
 		}
 
-		// POLYGON 记录（POUR/COPPER）的 ID 在整个文件内必须唯一；
-		// POLYVOID 复用其所属 COPPER 的 ID，从而在铜填充上镂空出热焊圆环。
-		const pourId = nextPolyId++;
+		// 只输出实际铜填充（COPPER）及其挖空（POLYVOID），避免再输出
+		// 覆铜边框（POUR）造成与填充区域重叠的额外铜皮。
 		const copperId = nextPolyId++;
-		writeRing(pour.boundary, 'pour', pour.lineWidth, pourId);
 		writeRing(pour.outline, 'copper', 0, copperId);
 		for (const hole of pour.holes)
 			writeRing(hole, 'hole', 0, copperId);
@@ -124,8 +128,53 @@ export function writeNetObjects(
 				`  (SEG X1=${coord(spoke.x1)} Y1=${coord(spoke.y1)} X2=${coord(spoke.x2)} Y2=${coord(spoke.y2)} W=${coord(spoke.width)} L="${layerName}")`,
 			);
 		}
+	}
 
-		nextPolyId++;
+	// 实心铜填充 / 铜皮区域输出为 COPPER + POLYVOID。
+	for (const fill of [...objects.fills, ...objects.regions]) {
+		const layerName = layerNameOf(fill.layer);
+		if (!layerName)
+			continue;
+
+		function writeRing(segments: PolygonSegment[], type: 'copper' | 'hole', id: number, width: number): void {
+			if (segments.length === 0)
+				return;
+			const head = segments[0];
+			if (type === 'hole') {
+				lines.push(`  {POLYVOID ID=${id} X=${coord(head.x1)} Y=${coord(head.y1)}`);
+			}
+			else {
+				lines.push(
+					`  {POLYGON T=COPPER L="${layerName}" W=${coord(width)} ID=${id} X=${coord(head.x1)} Y=${coord(head.y1)}`,
+				);
+			}
+
+			for (const seg of segments) {
+				if (seg.type === 'arc') {
+					lines.push(
+						`    (CURVE X1=${coord(seg.x1)} Y1=${coord(seg.y1)} X2=${coord(seg.x2)} Y2=${coord(seg.y2)} XC=${coord(seg.cx)} YC=${coord(seg.cy)} R=${coord(seg.radius)})`,
+					);
+				}
+				else {
+					lines.push(`    (LINE X=${coord(seg.x2)} Y=${coord(seg.y2)})`);
+				}
+			}
+
+			// Close the ring if it isn't already.
+			const tail = segments[segments.length - 1];
+			const closed = Math.abs(tail.x2 - head.x1) < 1e-9 && Math.abs(tail.y2 - head.y1) < 1e-9;
+			if (!closed)
+				lines.push(`    (LINE X=${coord(head.x1)} Y=${coord(head.y1)})`);
+
+			lines.push('  }');
+		}
+
+		const fillId = nextPolyId++;
+		let first = true;
+		for (const ring of fill.rings) {
+			writeRing(ring, first ? 'copper' : 'hole', fillId, first ? fill.lineWidth : 0);
+			first = false;
+		}
 	}
 
 	lines.push('}');

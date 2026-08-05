@@ -349,7 +349,7 @@ export function parsePolygonSourceSegments(src: Array<string | number>, bezierSt
 					cx,
 					cy,
 					radius,
-					ccw: mode === 'ARC' ? angle >= 0 : ccw,
+					ccw,
 				});
 			}
 			lastX = ex;

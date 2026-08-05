@@ -6,6 +6,7 @@ import type {
 	LayerInfo,
 	PadExportInfo,
 	PadStackEntry,
+	PolygonFillInfo,
 	PolygonSegment,
 	PourPolygonInfo,
 	PourSpoke,
@@ -214,6 +215,64 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 	return result;
 }
 
+function parsePolygonSourceToRings(src: Array<string | number>[]): PolygonSegment[][] {
+	const rings: PolygonSegment[][] = [];
+	for (const ringSrc of src) {
+		const segs = parsePolygonSourceSegments(ringSrc);
+		if (segs.length > 0)
+			rings.push(segs);
+	}
+	return rings;
+}
+
+async function collectPolygonFills(copperLayerIds: number[]): Promise<PolygonFillInfo[]> {
+	const allFills = await eda.pcb_PrimitiveFill.getAll();
+	const result: PolygonFillInfo[] = [];
+	for (const fill of allFills) {
+		const layer = fill.getState_Layer() as number;
+		if (!copperLayerIds.includes(layer))
+			continue;
+		const poly = fill.getState_ComplexPolygon();
+		const src = poly.getSource();
+		const sources = Array.isArray(src[0]) ? (src as Array<Array<string | number>>) : [src as Array<string | number>];
+		const rings = parsePolygonSourceToRings(sources);
+		if (rings.length === 0)
+			continue;
+		const rawWidth = Number(fill.getState_LineWidth()) || 0;
+		result.push({
+			net: fill.getState_Net() || '',
+			layer,
+			lineWidth: rawWidth,
+			rings,
+		});
+	}
+	return result;
+}
+
+async function collectPolygonRegions(copperLayerIds: number[]): Promise<PolygonFillInfo[]> {
+	const allRegions = await eda.pcb_PrimitiveRegion.getAll();
+	const result: PolygonFillInfo[] = [];
+	for (const region of allRegions) {
+		const layer = region.getState_Layer() as number;
+		if (!copperLayerIds.includes(layer))
+			continue;
+		const poly = region.getState_ComplexPolygon();
+		const src = poly.getSource();
+		const sources = Array.isArray(src[0]) ? (src as Array<Array<string | number>>) : [src as Array<string | number>];
+		const rings = parsePolygonSourceToRings(sources);
+		if (rings.length === 0)
+			continue;
+		const rawWidth = Number(region.getState_LineWidth()) || 0;
+		result.push({
+			net: '',
+			layer,
+			lineWidth: rawWidth,
+			rings,
+		});
+	}
+	return result;
+}
+
 export async function collectBoardData(): Promise<BoardData> {
 	const nets = await eda.pcb_Net.getAllNetsName();
 	const allComponents = await eda.pcb_PrimitiveComponent.getAll();
@@ -226,6 +285,8 @@ export async function collectBoardData(): Promise<BoardData> {
 	const copperLayerIds = copperLayers.map(l => l.id);
 	const outlineSegments = await collectOutlineSegments();
 	const pours = await collectPours(copperLayerIds);
+	const fills = await collectPolygonFills(copperLayerIds);
+	const regions = await collectPolygonRegions(copperLayerIds);
 
 	const components: ComponentInfo[] = [];
 	for (const comp of allComponents) {
@@ -368,5 +429,7 @@ export async function collectBoardData(): Promise<BoardData> {
 		padExports,
 		outlineSegments,
 		pours,
+		fills,
+		regions,
 	};
 }

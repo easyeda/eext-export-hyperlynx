@@ -118,6 +118,15 @@ export interface PourPolygonInfo {
 	spokes: PourSpoke[];
 }
 
+/** 实心铜填充 / 铜皮区域（PrimitiveFill / PrimitiveRegion），单位 mil */
+export interface PolygonFillInfo {
+	net: string;
+	layer: number;
+	lineWidth: number;
+	/** 多边形环，第一个为外轮廓，其余为挖空 */
+	rings: PolygonSegment[][];
+}
+
 export interface BoardData {
 	copperLayers: LayerInfo[];
 	nets: string[];
@@ -129,6 +138,8 @@ export interface BoardData {
 	padExports: PadExportInfo[];
 	outlineSegments: BoardOutlineSegment[];
 	pours: PourPolygonInfo[];
+	fills: PolygonFillInfo[];
+	regions: PolygonFillInfo[];
 }
 
 export const LAYER_TOP = 1;

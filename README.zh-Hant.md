@@ -4,6 +4,8 @@
 
 嘉立創EDA (EasyEDA) 專業版擴展 — 將 PCB 設計匯出為 HyperLynx (.hyp) 檔案格式，用於信號完整性模擬分析。
 
+![alt text](images/image1.png)
+
 ## 功能特點
 
 - 將目前 PCB 文件匯出為 HyperLynx 2.14 格式 `.hyp` 檔案

@@ -4,6 +4,8 @@
 
 An EasyEDA Pro extension that exports PCB designs to HyperLynx (.hyp) file format for signal-integrity simulation and analysis.
 
+![alt text](images/image1.png)
+
 ## Features
 
 - Export the current PCB document to a HyperLynx 2.14 `.hyp` file

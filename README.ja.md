@@ -4,6 +4,8 @@
 
 EasyEDA Pro 拡張機能 — PCB 設計を HyperLynx (.hyp) ファイル形式にエクスポートし、信号整合性解析に利用します。
 
+![alt text](images/image1.png)
+
 ## 機能
 
 - 現在の PCB 文書を HyperLynx 2.14 形式の `.hyp` ファイルにエクスポート

@@ -68,7 +68,12 @@ export function writeNetObjects(
 			continue;
 		// EasyEDA 数据层 Y 轴与屏幕坐标一致，正角度为顺时针；
 		// HyperLynx 使用标准数学坐标系，正角度为逆时针，因此需要取反。
-		const arcAngle = -arc.arcAngle;
+		// 同时把角度归一化到 [-180, 180]，保证输出的是小圆弧。
+		let arcAngle = -arc.arcAngle;
+		if (arcAngle > 180)
+			arcAngle -= 360;
+		if (arcAngle < -180)
+			arcAngle += 360;
 		const { cx, cy, radius } = computeArcCenter(arc.startX, arc.startY, arc.endX, arc.endY, arcAngle);
 		lines.push(
 			`  (ARC X1=${coord(arc.startX)} Y1=${coord(arc.startY)} X2=${coord(arc.endX)} Y2=${coord(arc.endY)} XC=${coord(cx)} YC=${coord(cy)} R=${coord(radius)} W=${coord(arc.width)} L="${layerName}")`,

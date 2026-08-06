@@ -331,10 +331,15 @@ export function parsePolygonSourceSegments(src: Array<string | number>, bezierSt
 		}
 
 		if (mode === 'ARC' || mode === 'CARC') {
-			const angle = Number(src[i]);
+			let angle = Number(src[i]);
 			const ex = Number(src[i + 1]);
 			const ey = Number(src[i + 2]);
 			i += 3;
+			// 归一化到 [-180, 180]，确保导出的是小圆弧，同时避免超大角度导致 sin 计算失稳。
+			if (angle > 180)
+				angle -= 360;
+			if (angle < -180)
+				angle += 360;
 			const { cx, cy, radius, ccw } = computeArcCenter(lastX, lastY, ex, ey, angle);
 			if (radius === 0 || !Number.isFinite(radius)) {
 				segs.push({ type: 'line', x1: lastX, y1: lastY, x2: ex, y2: ey });

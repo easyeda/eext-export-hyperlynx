@@ -130,8 +130,9 @@ export function writeNetObjects(
 			lines.push('  }');
 		}
 
-		// 只输出实际铜填充（COPPER）及其挖空（POLYVOID），避免再输出
-		// 覆铜边框（POUR）造成与填充区域重叠的额外铜皮。
+		// 覆铜边框输出为 T=POUR，实际铜填充输出为 T=COPPER，挖空区域输出为 POLYVOID。
+		const pourId = nextPolyId++;
+		writeRing(pour.boundary, 'pour', pour.lineWidth, pourId);
 		const copperId = nextPolyId++;
 		writeRing(pour.outline, 'copper', 0, copperId);
 		for (const hole of pour.holes)

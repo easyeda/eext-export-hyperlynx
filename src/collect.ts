@@ -257,6 +257,14 @@ async function collectPolygonRegions(copperLayerIds: number[]): Promise<PolygonF
 		const layer = region.getState_Layer() as number;
 		if (!copperLayerIds.includes(layer))
 			continue;
+		// PrimitiveRegion 在 EasyEDA 中用于禁止/约束区域，不应作为铜皮导出。
+		// 只保留没有规则类型（即真正的铜皮区域）的极个别情况。
+		const ruleType = (region as any).getState_RuleType?.() as number | number[] | undefined;
+		const isKeepout = Array.isArray(ruleType)
+			? ruleType.some(t => [2, 3, 5, 6, 7, 8, 9].includes(t))
+			: typeof ruleType === 'number' && [2, 3, 5, 6, 7, 8, 9].includes(ruleType);
+		if (isKeepout)
+			continue;
 		const poly = region.getState_ComplexPolygon();
 		const src = poly.getSource();
 		const sources = Array.isArray(src[0]) ? (src as Array<Array<string | number>>) : [src as Array<string | number>];

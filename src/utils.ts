@@ -197,7 +197,7 @@ export function parsePolygonSource(src: Array<string | number>, arcSteps = 16): 
 		const last = pts[pts.length - 1];
 
 		if (mode === 'ARC' || mode === 'CARC') {
-			const angle = Number(src[i]);
+			const angle = mode === 'CARC' ? -Number(src[i]) : Number(src[i]);
 			const ex = Number(src[i + 1]);
 			const ey = Number(src[i + 2]);
 			i += 3;
@@ -331,7 +331,7 @@ export function parsePolygonSourceSegments(src: Array<string | number>, bezierSt
 		}
 
 		if (mode === 'ARC' || mode === 'CARC') {
-			let angle = Number(src[i]);
+			let angle = mode === 'CARC' ? -Number(src[i]) : Number(src[i]);
 			const ex = Number(src[i + 1]);
 			const ey = Number(src[i + 2]);
 			i += 3;

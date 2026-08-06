@@ -72,9 +72,14 @@ export function writeNetObjects(
 			arcAngle -= 360;
 		if (arcAngle < -180)
 			arcAngle += 360;
-		const { cx, cy, radius } = computeArcCenter(arc.startX, arc.startY, arc.endX, arc.endY, arcAngle);
+		const { cx, cy, radius, ccw } = computeArcCenter(arc.startX, arc.startY, arc.endX, arc.endY, arcAngle);
+		// HyperLynx 的 ARC 没有方向标志，实测其方向为顺时针；如果源圆弧为逆时针，
+		// 需要交换起点与终点，否则会在 HyperLynx 中显示为大圆弧或开口反向。
+		const [x1, y1, x2, y2] = ccw
+			? [arc.endX, arc.endY, arc.startX, arc.startY]
+			: [arc.startX, arc.startY, arc.endX, arc.endY];
 		lines.push(
-			`  (ARC X1=${coord(arc.startX)} Y1=${coord(arc.startY)} X2=${coord(arc.endX)} Y2=${coord(arc.endY)} XC=${coord(cx)} YC=${coord(cy)} R=${coord(radius)} W=${coord(arc.width)} L="${layerName}")`,
+			`  (ARC X1=${coord(x1)} Y1=${coord(y1)} X2=${coord(x2)} Y2=${coord(y2)} XC=${coord(cx)} YC=${coord(cy)} R=${coord(radius)} W=${coord(arc.width)} L="${layerName}")`,
 		);
 	}
 

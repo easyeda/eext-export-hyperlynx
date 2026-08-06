@@ -30,8 +30,9 @@ import {
 	POUR_UNIT_TO_MIL,
 } from './utils';
 
-function isThroughHolePadLayer(layerId: number): boolean {
-	return layerId === LAYER_MULTI;
+function isThroughHolePadLayer(layerId: number, drill = 0): boolean {
+	// 独立通孔焊盘可能不在 LAYER_MULTI 上，但只要带孔就按通孔处理。
+	return layerId === LAYER_MULTI || drill > 0;
 }
 
 /**
@@ -339,7 +340,7 @@ export async function collectBoardData(): Promise<BoardData> {
 		const drill = parsePadDrill(pad.getState_Hole());
 		const angle = normalizeAngle(pad.getState_Rotation() || 0);
 		const layerId = pad.getState_Layer() as number;
-		const isThrough = isThroughHolePadLayer(layerId);
+		const isThrough = isThroughHolePadLayer(layerId, drill);
 		const layers = isThrough ? copperLayerIds : [layerId];
 
 		if (!isThrough && !copperLayerIds.includes(layerId))

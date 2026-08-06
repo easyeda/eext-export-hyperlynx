@@ -66,10 +66,8 @@ export function writeNetObjects(
 		const layerName = layerNameOf(arc.layer);
 		if (!layerName)
 			continue;
-		// EasyEDA 数据层 Y 轴与屏幕坐标一致，正角度为顺时针；
-		// HyperLynx 使用标准数学坐标系，正角度为逆时针，因此需要取反。
-		// 同时把角度归一化到 [-180, 180]，保证输出的是小圆弧。
-		let arcAngle = -arc.arcAngle;
+		// 将角度归一化到 [-180, 180]，保证导出的是小圆弧。
+		let arcAngle = arc.arcAngle;
 		if (arcAngle > 180)
 			arcAngle -= 360;
 		if (arcAngle < -180)

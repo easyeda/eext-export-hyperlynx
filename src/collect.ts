@@ -147,13 +147,17 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 		return parsePolygonSourceSegments(src);
 	}
 
-	const meta = new Map<string, { net: string; layer: number; boundary: PolygonSegment[] }>();
+	const meta = new Map<string, { net: string; layer: number; lineWidth: number; boundary: PolygonSegment[] }>();
 	for (const p of pours) {
 		const raw = p.getState_ComplexPolygon().getSource();
 		const src = Array.isArray(raw[0]) ? raw[0] : raw;
+		// 铺铜属性里的线宽单位为 mm，需换算为 mil；取不到时默认 8 mil。
+		const rawLineWidth = Number(p.getState_LineWidth()) || 0;
+		const lineWidth = rawLineWidth > 0 ? rawLineWidth / 0.0254 : 8;
 		meta.set(p.getState_PrimitiveId(), {
 			net: p.getState_Net() || '',
 			layer: p.getState_Layer() as number,
+			lineWidth,
 			boundary: parseBoundary(src),
 		});
 	}
@@ -173,9 +177,8 @@ async function collectPours(copperLayerIds: number[]): Promise<PourPolygonInfo[]
 				.getSourceStrictComplex()
 				.map(scale);
 
-			// EasyEDA 未给出宽度时，使用 HyperLynx 常见的 1 mil 轮廓线宽。
-			const rawWidth = Number(fill.lineWidth) || 0;
-			const lineWidth = rawWidth > 0 ? rawWidth * POUR_UNIT_TO_MIL : 1;
+			// 使用铺铜属性线宽（已换算为 mil），取不到时使用 8 mil 默认值。
+			const lineWidth = info.lineWidth;
 
 			// 热焊辐条是开放的 1 段线段（fill=false），需单独收集，否则会被按闭合环过滤丢弃。
 			const closedRings = rings.filter(ring => ring.length >= 3);

@@ -83,6 +83,15 @@ export function writeNetObjects(
 		);
 	}
 
+	function curveLine(seg: PolygonSegment): string {
+		// HyperLynx CURVE 的方向实测为逆时针；若源圆弧为顺时针，交换起止点。
+		const x1 = seg.ccw ? seg.x1 : seg.x2;
+		const y1 = seg.ccw ? seg.y1 : seg.y2;
+		const x2 = seg.ccw ? seg.x2 : seg.x1;
+		const y2 = seg.ccw ? seg.y2 : seg.y1;
+		return `    (CURVE X1=${coord(x1)} Y1=${coord(y1)} X2=${coord(x2)} Y2=${coord(y2)} XC=${coord(seg.cx)} YC=${coord(seg.cy)} R=${coord(seg.radius)})`;
+	}
+
 	let nextPolyId = polyId;
 	for (const pour of objects.pours) {
 		const layerName = layerNameOf(pour.layer);
@@ -105,9 +114,7 @@ export function writeNetObjects(
 
 			for (const seg of segments) {
 				if (seg.type === 'arc') {
-					lines.push(
-						`    (CURVE X1=${coord(seg.x1)} Y1=${coord(seg.y1)} X2=${coord(seg.x2)} Y2=${coord(seg.y2)} XC=${coord(seg.cx)} YC=${coord(seg.cy)} R=${coord(seg.radius)})`,
-					);
+					lines.push(curveLine(seg));
 				}
 				else {
 					lines.push(`    (LINE X=${coord(seg.x2)} Y=${coord(seg.y2)})`);
@@ -159,9 +166,7 @@ export function writeNetObjects(
 
 			for (const seg of segments) {
 				if (seg.type === 'arc') {
-					lines.push(
-						`    (CURVE X1=${coord(seg.x1)} Y1=${coord(seg.y1)} X2=${coord(seg.x2)} Y2=${coord(seg.y2)} XC=${coord(seg.cx)} YC=${coord(seg.cy)} R=${coord(seg.radius)})`,
-					);
+					lines.push(curveLine(seg));
 				}
 				else {
 					lines.push(`    (LINE X=${coord(seg.x2)} Y=${coord(seg.y2)})`);

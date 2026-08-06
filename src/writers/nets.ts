@@ -130,9 +130,18 @@ export function writeNetObjects(
 			lines.push('  }');
 		}
 
-		// 覆铜边框输出为 T=POUR，实际铜填充输出为 T=COPPER，挖空区域输出为 POLYVOID。
-		const pourId = nextPolyId++;
-		writeRing(pour.boundary, 'pour', pour.lineWidth, pourId);
+		// 覆铜边框输出为布线线段（包边），实际铜填充输出为 T=COPPER，挖空区域输出为 POLYVOID。
+		for (const seg of pour.boundary) {
+			if (seg.type === 'arc') {
+				const [x1, y1, x2, y2] = seg.ccw
+					? [seg.x2, seg.y2, seg.x1, seg.y1]
+					: [seg.x1, seg.y1, seg.x2, seg.y2];
+				lines.push(`  (ARC X1=${coord(x1)} Y1=${coord(y1)} X2=${coord(x2)} Y2=${coord(y2)} XC=${coord(seg.cx)} YC=${coord(seg.cy)} R=${coord(seg.radius)} W=${coord(pour.lineWidth)} L="${layerName}")`);
+			}
+			else {
+				lines.push(`  (SEG X1=${coord(seg.x1)} Y1=${coord(seg.y1)} X2=${coord(seg.x2)} Y2=${coord(seg.y2)} W=${coord(pour.lineWidth)} L="${layerName}")`);
+			}
+		}
 		const copperId = nextPolyId++;
 		writeRing(pour.outline, 'copper', 0, copperId);
 		for (const hole of pour.holes)

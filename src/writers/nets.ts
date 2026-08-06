@@ -130,8 +130,8 @@ export function writeNetObjects(
 			lines.push('  }');
 		}
 
-		// 覆铜边框输出为布线线段（包边），实际铜填充输出为 T=COPPER，挖空区域输出为 POLYVOID。
-		for (const seg of pour.boundary) {
+		// 覆铜填充边沿轮廓输出为布线线段（包边），挖空区域输出为 POLYVOID。
+		for (const seg of pour.outline) {
 			if (seg.type === 'arc') {
 				const [x1, y1, x2, y2] = seg.ccw
 					? [seg.x2, seg.y2, seg.x1, seg.y1]
